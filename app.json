@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Memorize",
+    "slug": "memorize",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nezox78.memorize"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F6FB",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.nezox78.memorize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
