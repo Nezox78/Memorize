@@ -1,33 +1,79 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { EMPTY_PROGRESS, Progress, Word, applyAnswer } from './logic/engine';
+import { ALL_THEMES } from './data/words';
+import { EMPTY_PROGRESS, Progress, ThemeId, Word, applyAnswer } from './logic/engine';
 
-const STORAGE_KEY = 'memorize.progress.v1';
+const PROGRESS_KEY = 'memorize.progress.v1';
+const SETTINGS_KEY = 'memorize.settings.v1';
 
 /** Progression de l'utilisateur, chargée puis sauvegardée sur l'appareil. */
 export function useProgress() {
   const [progress, setProgress] = useState<Progress | null>(null);
+  // Référence à jour même quand deux mises à jour se suivent dans le même rendu.
+  const latest = useRef<Progress>(EMPTY_PROGRESS);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => setProgress(raw ? { ...EMPTY_PROGRESS, ...JSON.parse(raw) } : EMPTY_PROGRESS))
-      .catch(() => setProgress(EMPTY_PROGRESS));
+    AsyncStorage.getItem(PROGRESS_KEY)
+      .then((raw) => (raw ? { ...EMPTY_PROGRESS, ...JSON.parse(raw) } : EMPTY_PROGRESS))
+      .catch(() => EMPTY_PROGRESS)
+      .then((loaded) => {
+        latest.current = loaded;
+        setProgress(loaded);
+      });
   }, []);
 
-  const update = useCallback((next: Progress) => {
+  const update = useCallback((change: (current: Progress) => Progress) => {
+    const next = change(latest.current);
+    latest.current = next;
     setProgress(next);
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
+    AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(next)).catch(() => {});
   }, []);
 
   const answer = useCallback(
-    (word: Word, correct: boolean) => {
-      if (progress) update(applyAnswer(progress, word, correct));
-    },
-    [progress, update],
+    (word: Word, correct: boolean) => update((p) => applyAnswer(p, word, correct)),
+    [update],
   );
 
-  const reset = useCallback(() => update(EMPTY_PROGRESS), [update]);
+  /** Fin d'une session de cartes, ou d'un quiz (avec son score). */
+  const finishSession = useCallback(
+    (quizScore?: number) =>
+      update((p) => ({
+        ...p,
+        sessions: p.sessions + 1,
+        quizBest: Math.max(p.quizBest, quizScore ?? 0),
+      })),
+    [update],
+  );
 
-  return { progress, answer, reset };
+  const reset = useCallback(() => update(() => EMPTY_PROGRESS), [update]);
+
+  return { progress, answer, finishSession, reset };
+}
+
+export type Settings = { name: string; themes: ThemeId[] };
+
+const DEFAULT_SETTINGS: Settings = { name: '', themes: ALL_THEMES };
+
+/** Prénom et thèmes de mots choisis, sauvegardés sur l'appareil. */
+export function useSettings() {
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY)
+      .then((raw) => {
+        if (raw) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
+      })
+      .catch(() => {});
+  }, []);
+
+  const change = useCallback((patch: Partial<Settings>) => {
+    setSettings((current) => {
+      const next = { ...current, ...patch };
+      AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  return { settings, change };
 }

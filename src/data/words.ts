@@ -1,6 +1,6 @@
-import type { Word } from '../logic/engine';
+import type { ThemeId, Word } from '../logic/engine';
 
-// Format compact : "français=anglais", un mot par entrée, séparés par ";".
+// Format compact : "français=anglais", séparés par ";".
 // L'index du tableau correspond au niveau de départ (0 = Débutant … 4 = Expert).
 const RAW: string[] = [
   // Débutant
@@ -11,7 +11,9 @@ const RAW: string[] = [
   nuit=night;matin=morning;soir=evening;rouge=red;bleu=blue;vert=green;noir=black;blanc=white;grand=big;petit=small;
   chaud=hot;froid=cold;bon=good;mauvais=bad;heureux=happy;triste=sad;manger=to eat;boire=to drink;dormir=to sleep;
   parler=to speak;marcher=to walk;courir=to run;lire=to read;écrire=to write;oui=yes;non=no;merci=thank you;
-  bonjour=hello;fromage=cheese;œuf=egg;poisson=fish;oiseau=bird;cheval=horse;mer=sea;ciel=sky;pluie=rain;neige=snow`,
+  bonjour=hello;fromage=cheese;œuf=egg;poisson=fish;oiseau=bird;cheval=horse;mer=sea;ciel=sky;pluie=rain;neige=snow;
+  train=train;bus=bus;riz=rice;beurre=butter;soupe=soup;thé=tea;café=coffee;fruit=fruit;gâteau=cake;
+  hôpital=hospital;église=church;pull=sweater;jupe=skirt`,
 
   // Novice
   `cuisine=kitchen;chambre=bedroom;salle de bain=bathroom;jardin=garden;clé=key;montre=watch;chemise=shirt;
@@ -25,7 +27,10 @@ const RAW: string[] = [
   écouter=to listen;regarder=to look at;attendre=to wait;chercher=to look for;trouver=to find;donner=to give;
   prendre=to take;cuisiner=to cook;nager=to swim;chanter=to sing;danser=to dance;voyager=to travel;
   médecin=doctor;professeur=teacher;voisin=neighbour;légume=vegetable;viande=meat;sucre=sugar;sel=salt;
-  couteau=knife;fourchette=fork;cuillère=spoon;verre=glass;assiette=plate`,
+  couteau=knife;fourchette=fork;cuillère=spoon;verre=glass;assiette=plate;chaussette=sock;veste=jacket;
+  écharpe=scarf;gant=glove;ceinture=belt;cravate=tie;poche=pocket;camion=truck;moto=motorbike;métro=subway;
+  roue=wheel;bibliothèque=library;usine=factory;immeuble=building;poulet=chicken;fraise=strawberry;oignon=onion;
+  pomme de terre=potato;petit-déjeuner=breakfast`,
 
   // Intermédiaire
   `environnement=environment;réunion=meeting;entreprise=company;salaire=salary;facture=bill;loyer=rent;impôt=tax;
@@ -40,7 +45,10 @@ const RAW: string[] = [
   fiable=reliable;têtu=stubborn;timide=shy;paresseux=lazy;généreux=generous;jaloux=jealous;poli=polite;
   grossier=rude;courageux=brave;épuisé=exhausted;inquiet=worried;déçu=disappointed;surpris=surprised;
   pourtant=however;plutôt=rather;presque=almost;déjà=already;bientôt=soon;partout=everywhere;ailleurs=elsewhere;
-  malgré=despite;gouvernement=government;loi=law;preuve=evidence;tribunal=court`,
+  malgré=despite;gouvernement=government;loi=law;preuve=evidence;tribunal=court;bouton=button;manche=sleeve;
+  col=collar;volant=steering wheel;pneu=tyre;frein=brake;moteur=engine;coffre=trunk;mairie=town hall;
+  autoroute=motorway;trottoir=pavement;carrefour=crossroads;farine=flour;ail=garlic;champignon=mushroom;
+  miel=honey;recette=recipe;imperméable=raincoat;survêtement=tracksuit`,
 
   // Avancé
   `défi=challenge;atout=asset;lacune=gap;aperçu=overview;échéance=deadline;pénurie=shortage;déclin=decline;
@@ -56,7 +64,10 @@ const RAW: string[] = [
   éternuer=to sneeze;boiter=to limp;maladroit=clumsy;rusé=cunning;avare=stingy;étourdi=absent-minded;
   louche=shady;épais=thick;mince=thin;lisse=smooth;rugueux=rough;tiède=lukewarm;émoussé=blunt;
   néanmoins=nevertheless;désormais=from now on;d'ailleurs=besides;quant à=as for;à peine=barely;
-  en revanche=on the other hand;auparavant=previously;durable=sustainable;rentable=profitable`,
+  en revanche=on the other hand;auparavant=previously;durable=sustainable;rentable=profitable;lacet=shoelace;
+  fermeture éclair=zip;pare-brise=windscreen;remorque=trailer;embrayage=clutch;rétroviseur=rear-view mirror;
+  barrage=dam;entrepôt=warehouse;échangeur=interchange;levure=yeast;persil=parsley;noisette=hazelnut;
+  courgette=zucchini;aubergine=eggplant`,
 
   // Expert
   `éphémère=short-lived;désinvolte=offhand;acharné=relentless;farouche=fierce;chatoyant=shimmering;
@@ -73,16 +84,52 @@ const RAW: string[] = [
   ébrécher=to chip;émietter=to crumble;tamiser=to sift;étancher=to quench;esquiver=to dodge;choyer=to pamper;
   enjôler=to coax;narguer=to taunt;houspiller=to scold;saugrenu=preposterous;cocasse=comical;blafard=wan;
   penaud=sheepish;revêche=surly;mesquin=petty;sournois=sly;vétuste=dilapidated;exigu=cramped;touffu=bushy;
-  rêche=coarse;à l'improviste=unexpectedly;en catimini=on the sly;d'emblée=from the outset`,
+  rêche=coarse;à l'improviste=unexpectedly;en catimini=on the sly;d'emblée=from the outset;ourlet=hem;
+  doublure=lining;essieu=axle;péniche=barge;écluse=lock;passerelle=footbridge;beffroi=belfry;ciboulette=chives;
+  coing=quince;groseille=redcurrant;bretelles=braces;boutonnière=buttonhole;pare-chocs=bumper;
+  enjoliveur=hubcap`,
 ];
 
-export const WORDS: Word[] = RAW.flatMap((block, level) =>
+// Mots rattachés à un thème ; tous les autres vont dans « Vocabulaire général ».
+const THEME_WORDS: Record<Exclude<ThemeId, 'general'>, string> = {
+  food: `pain;pomme;lait;fromage;œuf;poisson;eau;manger;boire;riz;beurre;soupe;thé;café;fruit;gâteau;légume;viande;
+    sucre;sel;cuisiner;couteau;fourchette;cuillère;verre;assiette;poulet;fraise;oignon;pomme de terre;
+    petit-déjeuner;goût;farine;ail;champignon;miel;recette;mâcher;avaler;récolte;levure;persil;noisette;
+    courgette;aubergine;pétrir;émietter;tamiser;ciboulette;coing;groseille`,
+  clothes: `pull;jupe;montre;chemise;pantalon;chaussure;chapeau;manteau;robe;chaussette;veste;écharpe;gant;
+    ceinture;cravate;poche;bouton;manche;col;imperméable;survêtement;lacet;fermeture éclair;ourlet;doublure;
+    bretelles;boutonnière`,
+  vehicles: `voiture;train;bus;avion;bateau;vélo;camion;moto;métro;roue;volant;pneu;frein;moteur;coffre;
+    pare-brise;remorque;embrayage;rétroviseur;essieu;péniche;pare-chocs;enjoliveur;voyager`,
+  places: `maison;école;ville;rue;porte;fenêtre;hôpital;église;cuisine;chambre;salle de bain;jardin;magasin;
+    marché;gare;aéroport;pont;route;bibliothèque;usine;immeuble;mairie;autoroute;trottoir;carrefour;tribunal;
+    barrage;entrepôt;échangeur;échafaudage;écluse;passerelle;beffroi`,
+};
+
+const split = (block: string) =>
   block
     .split(';')
     .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const [french, english] = entry.split('=');
-      return { french, english, level };
-    }),
+    .filter(Boolean);
+
+const themeOf = new Map<string, ThemeId>();
+for (const [theme, block] of Object.entries(THEME_WORDS)) {
+  for (const french of split(block)) themeOf.set(french, theme as ThemeId);
+}
+
+export const WORDS: Word[] = RAW.flatMap((block, level) =>
+  split(block).map((entry) => {
+    const [french, english] = entry.split('=');
+    return { french, english, level, theme: themeOf.get(french) ?? 'general' };
+  }),
 );
+
+export const THEMES: { id: ThemeId; name: string; text: string }[] = [
+  { id: 'food', name: 'Aliments', text: 'Fruits, légumes, boissons, repas…' },
+  { id: 'clothes', name: 'Vêtements', text: 'Habits, chaussures, accessoires…' },
+  { id: 'vehicles', name: 'Véhicules', text: 'Voitures, transports, moyens de locomotion…' },
+  { id: 'places', name: 'Infrastructures', text: 'Bâtiments, lieux publics, architectures…' },
+  { id: 'general', name: 'Vocabulaire général', text: 'Tous les autres mots du quotidien…' },
+];
+
+export const ALL_THEMES: ThemeId[] = THEMES.map((theme) => theme.id);

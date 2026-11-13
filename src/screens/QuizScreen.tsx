@@ -2,15 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { WORDS } from '../data/words';
+import { Header, ProgressBar } from '../components/ui';
 import { Progress, Word, pickWord } from '../logic/engine';
 import { Colors, useStyles, useTheme } from '../theme';
 
 const QUESTIONS = 10;
+const LIVES = 3;
 
 type Props = {
+  words: Word[];
   progress: Progress;
   onAnswer: (word: Word, correct: boolean) => void;
+  onFinish: (score: number) => void;
+  onBack: () => void;
 };
 
 /** « To Eat  » et « eat » sont acceptés pour « to eat ». */
@@ -23,16 +27,18 @@ function normalize(text: string): string {
     .replace(/^to /, '');
 }
 
-export function QuizScreen({ progress, onAnswer }: Props) {
+export function QuizScreen({ words, progress, onAnswer, onFinish, onBack }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
-  const [word, setWord] = useState(() => pickWord(WORDS, progress));
+  const [word, setWord] = useState(() => pickWord(words, progress));
   const [index, setIndex] = useState(0);
   const [input, setInput] = useState('');
   const [result, setResult] = useState<boolean | null>(null);
   const [score, setScore] = useState({ correct: 0, wrong: 0, streak: 0 });
+  const [finished, setFinished] = useState(false);
 
-  const finished = index >= QUESTIONS;
+  const lives = LIVES - score.wrong;
+  const lastQuestion = index + 1 === QUESTIONS || (result === false && lives <= 0);
 
   const check = () => {
     if (result !== null || !input.trim()) return;
@@ -47,8 +53,13 @@ export function QuizScreen({ progress, onAnswer }: Props) {
   };
 
   const next = () => {
+    if (lastQuestion) {
+      onFinish(score.correct);
+      setFinished(true);
+      return;
+    }
     setIndex((i) => i + 1);
-    setWord(pickWord(WORDS, progress, [word.french]));
+    setWord(pickWord(words, progress, [word.french]));
     setInput('');
     setResult(null);
   };
@@ -56,27 +67,33 @@ export function QuizScreen({ progress, onAnswer }: Props) {
   const restart = () => {
     setIndex(0);
     setScore({ correct: 0, wrong: 0, streak: 0 });
-    setWord(pickWord(WORDS, progress, [word.french]));
+    setWord(pickWord(words, progress, [word.french]));
     setInput('');
     setResult(null);
+    setFinished(false);
   };
+
+  const answered = index + (result !== null ? 1 : 0);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Header
+        title="Quiz"
+        subtitle={finished ? 'Terminé' : `Question ${index + 1} / ${QUESTIONS}`}
+        onBack={onBack}
+        right={
+          <View style={styles.lives} accessibilityLabel={`${Math.max(lives, 0)} vies restantes`}>
+            <Ionicons name="heart-outline" size={26} color={colors.error} />
+            <Text style={styles.livesText}>{Math.max(lives, 0)}</Text>
+          </View>
+        }
+      />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Text style={styles.title}>Quiz</Text>
-          <Text style={styles.subtitle}>
-            {finished ? 'Terminé' : `Question ${index + 1} / ${QUESTIONS}`}
-          </Text>
-        </View>
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${(Math.min(index + (result !== null ? 1 : 0), QUESTIONS) / QUESTIONS) * 100}%` }]} />
-        </View>
+        <ProgressBar percent={(answered / QUESTIONS) * 100} color={colors.accent} />
 
         {finished ? (
           <View style={styles.panel}>
-            <Text style={styles.label}>Votre score</Text>
+            <Text style={styles.label}>{lives <= 0 ? 'Plus de vies !' : 'Quiz terminé'}</Text>
             <Text style={styles.word}>
               {score.correct} / {QUESTIONS}
             </Text>
@@ -86,7 +103,7 @@ export function QuizScreen({ progress, onAnswer }: Props) {
           </View>
         ) : (
           <View style={styles.panel}>
-            <Text style={styles.label}>Écrivez la traduction en anglais</Text>
+            <Text style={styles.label}>Écrivez la traduction</Text>
             <Text style={styles.word} adjustsFontSizeToFit numberOfLines={2}>
               {word.french}
             </Text>
@@ -94,7 +111,7 @@ export function QuizScreen({ progress, onAnswer }: Props) {
               value={input}
               onChangeText={setInput}
               editable={result === null}
-              placeholder="Tapez votre réponse…"
+              placeholder="Tapez votre réponse..."
               placeholderTextColor={colors.muted}
               autoCapitalize="none"
               autoCorrect={false}
@@ -125,7 +142,7 @@ export function QuizScreen({ progress, onAnswer }: Props) {
               style={[styles.primary, result === null && !input.trim() && { opacity: 0.4 }]}
             >
               <Text style={styles.primaryText}>
-                {result === null ? 'Vérifier' : index + 1 === QUESTIONS ? 'Voir le score' : 'Suivant'}
+                {result === null ? 'Vérifier' : lastQuestion ? 'Voir le score' : 'Suivant'}
               </Text>
             </Pressable>
           </View>
@@ -153,39 +170,36 @@ function Tile({ value, label, color, soft }: { value: number; label: string; col
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28, gap: 16 },
-    header: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-    title: { fontSize: 26, fontWeight: '800', color: c.text },
-    subtitle: { fontSize: 14, color: c.muted, fontWeight: '600' },
-    track: { height: 8, borderRadius: 4, backgroundColor: c.track, overflow: 'hidden' },
-    fill: { height: 8, borderRadius: 4, backgroundColor: c.accent },
+    content: { paddingHorizontal: 20, paddingBottom: 28, gap: 22 },
+    lives: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    livesText: { fontSize: 18, fontWeight: '800', color: c.text },
     panel: {
       backgroundColor: c.card,
-      borderRadius: 18,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: c.border,
-      padding: 20,
-      gap: 14,
+      padding: 24,
+      gap: 16,
       alignItems: 'stretch',
     },
-    label: { fontSize: 14, color: c.muted, textAlign: 'center' },
-    word: { fontSize: 32, fontWeight: '800', color: c.text, textAlign: 'center' },
+    label: { fontSize: 16, color: c.muted, textAlign: 'center' },
+    word: { fontSize: 36, fontWeight: '800', color: c.text, textAlign: 'center' },
     input: {
       height: 50,
-      borderRadius: 12,
-      borderWidth: 1.5,
+      borderRadius: 10,
+      borderWidth: 1,
       borderColor: c.border,
-      backgroundColor: c.background,
-      paddingHorizontal: 16,
-      fontSize: 16,
+      backgroundColor: c.card,
+      paddingHorizontal: 18,
+      fontSize: 17,
       color: c.text,
     },
-    verdict: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12 },
-    verdictText: { fontWeight: '700', fontSize: 14, flex: 1 },
-    primary: { height: 48, borderRadius: 12, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
-    primaryText: { color: c.onAccent, fontWeight: '700', fontSize: 15 },
-    tiles: { flexDirection: 'row', gap: 10 },
-    tile: { flex: 1, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
-    tileValue: { fontSize: 24, fontWeight: '800' },
-    tileLabel: { fontSize: 13, fontWeight: '600' },
+    verdict: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10 },
+    verdictText: { fontWeight: '700', fontSize: 15, flex: 1 },
+    primary: { height: 48, borderRadius: 10, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
+    primaryText: { color: c.onAccent, fontWeight: '700', fontSize: 16 },
+    tiles: { flexDirection: 'row', gap: 16 },
+    tile: { flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+    tileValue: { fontSize: 28, fontWeight: '800' },
+    tileLabel: { fontSize: 15, fontWeight: '500' },
   });

@@ -1,150 +1,145 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Header, ProgressBar } from '../components/ui';
 import { WORDS } from '../data/words';
-import { LEVELS, Progress, WEIGHTS, computeStats, dayKey, dayStreak } from '../logic/engine';
+import { LEVELS, Progress, bestDayStreak, computeStats, currentWeek, dayStreak } from '../logic/engine';
 import { Colors, levelColors, useStyles, useTheme } from '../theme';
 
-type Props = { progress: Progress; onReset: () => void };
+export const WEEKLY_GOAL = 100;
 
 const WEEK = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-/** Les 7 jours de la semaine en cours, du lundi au dimanche. */
-function currentWeek(): string[] {
-  const monday = new Date();
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  return WEEK.map((_, i) => {
-    const day = new Date(monday);
-    day.setDate(monday.getDate() + i);
-    return dayKey(day);
-  });
-}
+type Props = { progress: Progress; onBack: () => void };
 
-export function StatsScreen({ progress, onReset }: Props) {
-  const { colors } = useTheme();
+export function StatsScreen({ progress, onBack }: Props) {
+  const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
   const stats = computeStats(WORDS, progress);
   const week = currentWeek();
+  const weekCount = week.reduce((sum, key) => sum + (progress.days[key] ?? 0), 0);
 
-  const badges: { icon: keyof typeof Ionicons.glyphMap; label: string; color: string; earned: boolean }[] = [
-    { icon: 'ribbon', label: 'Premier mot', color: '#F59E0B', earned: stats.answers >= 1 },
-    { icon: 'flame', label: 'Série de 10', color: '#16A34A', earned: progress.bestStreak >= 10 },
-    { icon: 'trophy', label: '100 réponses', color: '#3B82F6', earned: stats.answers >= 100 },
-    { icon: 'star', label: 'Premier Expert', color: '#9B5CF6', earned: stats.learned >= 1 },
+  const badges: { icon: keyof typeof MaterialCommunityIcons.glyphMap; label: string; color: string; earned: boolean }[] = [
+    { icon: 'medal-outline', label: 'Premier mot', color: '#FBBF24', earned: stats.answers >= 1 },
+    { icon: 'fire', label: 'Série de 7', color: '#16A34A', earned: bestDayStreak(progress) >= 7 },
+    { icon: 'brain', label: 'Quiz master', color: '#3B82F6', earned: progress.quizBest >= 8 },
   ];
 
-  const confirmReset = () => {
-    const message = 'Tous les mots reviendront à leur catégorie de départ.';
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Réinitialiser la progression ? ${message}`)) onReset();
-      return;
-    }
-    Alert.alert('Réinitialiser la progression ?', message, [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Réinitialiser', style: 'destructive', onPress: onReset },
-    ]);
-  };
-
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>Mes progrès</Text>
-
-      <View style={styles.panel}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.panelTitle}>Progression globale</Text>
-          <Text style={[styles.strong, { color: colors.accent }]}>{stats.globalProgress} %</Text>
-        </View>
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${stats.globalProgress}%`, backgroundColor: colors.accent }]} />
-        </View>
-        <Text style={styles.caption}>
-          Objectif : les {stats.total} mots en Expert · {stats.learned} appris · {stats.seen} déjà vus
-        </Text>
-      </View>
-
-      <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Précision</Text>
-        <Text style={styles.big}>{stats.successRate === null ? '—' : `${stats.successRate}%`}</Text>
-        <Text style={[styles.caption, { textAlign: 'center' }]}>de réponses correctes</Text>
-        <View style={styles.track}>
-          <View style={[styles.fill, { width: `${stats.successRate ?? 0}%`, backgroundColor: colors.success }]} />
-        </View>
-        <View style={styles.rowBetween}>
-          <Legend color={colors.success} text={`${progress.correct} correct${progress.correct > 1 ? 's' : ''}`} />
-          <Legend color={colors.error} text={`${progress.wrong} incorrect${progress.wrong > 1 ? 's' : ''}`} />
-        </View>
-      </View>
-
-      <View style={styles.panel}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.panelTitle}>Série quotidienne</Text>
-          <View style={styles.inline}>
-            <Ionicons name="flame" size={18} color={colors.warning} />
-            <Text style={[styles.strong, { color: colors.warning }]}>{dayStreak(progress)}</Text>
+    <View style={{ flex: 1 }}>
+      <Header title="Mes Progrès" onBack={onBack} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <LinearGradient
+          colors={[colors.weekFrom, colors.weekTo]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.hero}
+        >
+          <Text style={styles.heroTitle}>Cette semaine</Text>
+          <Text style={styles.heroText}>
+            <Text style={styles.heroNumber}>{weekCount}</Text>  mots révisés
+          </Text>
+          <View style={styles.rowBetween}>
+            <Text style={styles.heroSmall}>Objectif: {WEEKLY_GOAL} mots</Text>
+            <Text style={styles.heroSmall}>{Math.round((weekCount / WEEKLY_GOAL) * 100)}% complété</Text>
           </View>
-        </View>
-        <View style={styles.week}>
-          {week.map((key, i) => {
-            const done = Boolean(progress.days[key]);
-            return (
-              <View key={key} style={styles.weekDay}>
-                <Text style={styles.caption}>{WEEK[i]}</Text>
-                <View style={[styles.weekDot, done && { backgroundColor: colors.success, borderColor: colors.success }]}>
-                  {done && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
-                </View>
-              </View>
-            );
-          })}
-        </View>
-        <Text style={styles.caption}>
-          Meilleure série de bonnes réponses : {progress.bestStreak} · en cours : {progress.streak}
-        </Text>
-      </View>
+        </LinearGradient>
 
-      <Text style={styles.section}>Badges</Text>
-      <View style={styles.badges}>
-        {badges.map((badge) => (
-          <View key={badge.label} style={[styles.badge, !badge.earned && { opacity: 0.35 }]}>
-            <View style={[styles.badgeIcon, { backgroundColor: badge.earned ? badge.color : colors.track }]}>
-              <Ionicons name={badge.icon} size={26} color={badge.earned ? '#FFFFFF' : colors.muted} />
+        <View style={styles.panel}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.panelTitle}>Série quotidienne</Text>
+            <View style={styles.inline}>
+              <Ionicons name="flame-outline" size={24} color={colors.flame} />
+              <Text style={[styles.panelTitle, { color: colors.flame }]}>{dayStreak(progress)}</Text>
             </View>
-            <Text style={styles.badgeLabel}>{badge.label}</Text>
           </View>
-        ))}
-      </View>
+          <View style={styles.week}>
+            {week.map((key, i) => {
+              const done = Boolean(progress.days[key]);
+              return (
+                <View key={key} style={styles.weekDay}>
+                  <Text style={styles.caption}>{WEEK[i]}</Text>
+                  <View style={[styles.weekDot, done && { backgroundColor: '#16A34A' }]}>
+                    {done && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
 
-      <Text style={styles.section}>Catégories de révision</Text>
-      <View style={styles.panel}>
+        <View style={styles.panel}>
+          <View style={styles.inline}>
+            <Ionicons name="trophy-outline" size={22} color={colors.accent} />
+            <Text style={styles.panelTitle}>Statistiques générales</Text>
+          </View>
+          <View style={styles.numbers}>
+            <View style={styles.number}>
+              <Text style={[styles.numberValue, { color: colors.accent }]}>{stats.seen}</Text>
+              <Text style={styles.caption}>Mots révisés</Text>
+            </View>
+            <View style={styles.number}>
+              <Text style={[styles.numberValue, { color: colors.text }]}>{progress.sessions}</Text>
+              <Text style={styles.caption}>Sessions</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.panel}>
+          <View style={styles.inline}>
+            <MaterialCommunityIcons name="target" size={24} color={colors.success} />
+            <Text style={styles.panelTitle}>Précision</Text>
+          </View>
+          <Text style={styles.big}>{stats.successRate}%</Text>
+          <Text style={[styles.caption, { textAlign: 'center' }]}>de réponses correctes</Text>
+          <ProgressBar percent={stats.successRate} color={colors.success} />
+          <View style={styles.rowBetween}>
+            <Legend color={colors.success} text={`${progress.correct} correct${progress.correct > 1 ? 's' : ''}`} />
+            <Legend color={colors.error} text={`${progress.wrong} incorrect${progress.wrong > 1 ? 's' : ''}`} />
+          </View>
+        </View>
+
+        <Text style={styles.section}>Badges obtenus</Text>
+        <View style={styles.badges}>
+          {badges.map((badge) => (
+            <View key={badge.label} style={[styles.badge, !badge.earned && { opacity: 0.3 }]}>
+              <View style={[styles.badgeIcon, { backgroundColor: badge.color }]}>
+                <MaterialCommunityIcons name={badge.icon} size={34} color="#FFFFFF" />
+              </View>
+              <Text style={styles.badgeLabel}>{badge.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={styles.section}>Catégories de révision</Text>
         {LEVELS.map((name, i) => {
           const share = Math.round((stats.perLevel[i] / stats.total) * 100);
           return (
             <View key={name} style={styles.level}>
-              <View style={[styles.levelDot, { backgroundColor: levelColors[i] }]} />
-              <View style={{ flex: 1, gap: 6 }}>
-                <View style={styles.rowBetween}>
-                  <Text style={styles.levelName}>{name}</Text>
-                  <Text style={styles.caption}>
-                    {stats.perLevel[i]} mots · {share} %
-                  </Text>
-                </View>
-                <View style={styles.track}>
-                  <View style={[styles.fill, { width: `${share}%`, backgroundColor: levelColors[i] }]} />
-                </View>
-                <Text style={styles.caption}>{WEIGHTS[i]} % de chances d'apparition</Text>
+              <View style={styles.levelIcon}>
+                <LinearGradient
+                  colors={['#FFFFFF', levelColors[i]]}
+                  start={{ x: 0.2, y: 0 }}
+                  end={{ x: 0.6, y: 0.7 }}
+                  style={styles.levelBall}
+                />
               </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.levelName}>{name}</Text>
+                <Text style={styles.caption}>Catégorie {i + 1}</Text>
+              </View>
+              <Text style={styles.levelCount}>{stats.perLevel[i]} mots</Text>
+              <View style={styles.levelBar}>
+                <ProgressBar percent={share} color={levelColors[i]} />
+              </View>
+              <Text style={styles.levelPercent}>{share}%</Text>
+              <Ionicons name="chevron-forward" size={16} color={dark ? colors.muted : '#475569'} />
             </View>
           );
         })}
-      </View>
-
-      <Pressable
-        onPress={confirmReset}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.reset, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={styles.resetText}>Réinitialiser la progression</Text>
-      </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -160,45 +155,57 @@ function Legend({ color, text }: { color: string; text: string }) {
 
 const makeStyles = (c: Colors) =>
   StyleSheet.create({
-    content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28, gap: 14 },
-    title: { fontSize: 26, fontWeight: '800', color: c.text },
-    section: { fontSize: 18, fontWeight: '800', color: c.text, marginTop: 6 },
+    content: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 28, gap: 18 },
+    hero: { borderRadius: 18, padding: 26, gap: 10 },
+    heroTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+    heroText: { color: '#FFFFFF', fontSize: 20 },
+    heroNumber: { fontSize: 34, fontWeight: '800' },
+    heroSmall: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
+    section: { fontSize: 19, fontWeight: '800', color: c.text, marginTop: 4 },
     panel: {
       backgroundColor: c.card,
-      borderRadius: 18,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: c.border,
-      padding: 18,
-      gap: 12,
+      padding: 22,
+      gap: 14,
     },
-    panelTitle: { fontSize: 17, fontWeight: '800', color: c.text },
-    strong: { fontSize: 17, fontWeight: '800' },
-    big: { fontSize: 44, fontWeight: '800', color: c.success, textAlign: 'center' },
+    panelTitle: { fontSize: 19, fontWeight: '800', color: c.text },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-    inline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    track: { height: 8, borderRadius: 4, backgroundColor: c.track, overflow: 'hidden' },
-    fill: { height: 8, borderRadius: 4 },
-    caption: { fontSize: 12, color: c.muted },
-    legendDot: { width: 10, height: 10, borderRadius: 5 },
-    legendText: { fontSize: 13, color: c.text },
+    inline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    caption: { fontSize: 14, color: c.muted },
     week: { flexDirection: 'row', justifyContent: 'space-between' },
-    weekDay: { alignItems: 'center', gap: 6 },
+    weekDay: { alignItems: 'center', gap: 8 },
     weekDot: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      borderWidth: 1.5,
-      borderColor: c.border,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: c.track,
       alignItems: 'center',
       justifyContent: 'center',
     },
+    numbers: { flexDirection: 'row' },
+    number: { flex: 1, alignItems: 'center', gap: 2 },
+    numberValue: { fontSize: 32, fontWeight: '800' },
+    big: { fontSize: 52, fontWeight: '800', color: c.success, textAlign: 'center' },
+    legendDot: { width: 12, height: 12, borderRadius: 6 },
+    legendText: { fontSize: 15, color: c.text },
     badges: { flexDirection: 'row', justifyContent: 'space-between' },
-    badge: { alignItems: 'center', gap: 6, flex: 1 },
-    badgeIcon: { width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-    badgeLabel: { fontSize: 11, color: c.text, fontWeight: '600', textAlign: 'center' },
-    level: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-    levelDot: { width: 14, height: 14, borderRadius: 7, marginTop: 3 },
-    levelName: { fontSize: 15, fontWeight: '700', color: c.text },
-    reset: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 16 },
-    resetText: { color: c.error, fontWeight: '600', fontSize: 14 },
+    badge: { alignItems: 'center', gap: 8, flex: 1 },
+    badgeIcon: { width: 76, height: 76, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    badgeLabel: { fontSize: 14, color: c.text, fontWeight: '500', textAlign: 'center' },
+    level: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+    levelIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: c.track,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    levelBall: { width: 20, height: 20, borderRadius: 10 },
+    levelName: { fontSize: 16, fontWeight: '500', color: c.text },
+    levelCount: { fontSize: 14, fontWeight: '500', color: c.text },
+    levelBar: { width: 70 },
+    levelPercent: { fontSize: 15, color: c.muted, width: 40, textAlign: 'right' },
   });

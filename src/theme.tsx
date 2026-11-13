@@ -2,44 +2,81 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 
+import type { ThemeId } from './logic/engine';
+
 const light = {
-  background: '#F7F9FC',
+  background: '#FFFFFF',
   card: '#FFFFFF',
-  text: '#0B1020',
+  text: '#0B1220',
   muted: '#64748B',
   border: '#E2E8F0',
-  track: '#EDF1F7',
+  track: '#F1F5F9',
+  /** Fond des boutons ronds (retour, réglages). */
+  chip: '#F1F5F9',
+  /** Couleur principale : boutons, liens, chiffres mis en avant. */
   accent: '#3B82F6',
-  accentSoft: '#E8F1FF',
+  accentSoft: '#EFF6FF',
   onAccent: '#FFFFFF',
+  /** Onglet actif et barre de progression des cartes. */
+  highlight: '#16A34A',
   success: '#16A34A',
-  successSoft: '#EAFBF0',
+  successSoft: '#F0FDF4',
   error: '#EF4444',
-  errorSoft: '#FEF0F0',
-  warning: '#F59E0B',
+  errorSoft: '#FEF2F2',
+  /** Boutons Correct / Incorrect : pleins en clair, teintés en sombre. */
+  answerWrongBg: '#EF4444',
+  answerWrongText: '#FFFFFF',
+  answerRightBg: '#16A34A',
+  answerRightText: '#FFFFFF',
+  flame: '#FBBF24',
+  flip: '#FB923C',
+  heroFrom: '#16A34A',
+  heroTo: '#3B82F6',
+  weekFrom: '#FBBF24',
+  weekTo: '#FB923C',
 };
 
 export type Colors = typeof light;
 
 const dark: Colors = {
-  background: '#04060F',
-  card: '#15161B',
-  text: '#E8EAF2',
-  muted: '#8B90A0',
-  border: '#25272F',
-  track: '#24262E',
+  background: '#02040C',
+  card: '#141518',
+  text: '#E5E7EB',
+  muted: '#9CA3AF',
+  border: '#26272D',
+  track: '#25262C',
+  chip: '#1C1D22',
   accent: '#9B5CF6',
-  accentSoft: '#231A38',
-  onAccent: '#120B24',
+  accentSoft: '#211A33',
+  onAccent: '#150B2B',
+  highlight: '#9B5CF6',
   success: '#22C55E',
-  successSoft: '#0B2217',
+  successSoft: '#0A1F17',
   error: '#F05252',
-  errorSoft: '#2A1217',
-  warning: '#FB923C',
+  errorSoft: '#1F1218',
+  answerWrongBg: '#1F1218',
+  answerWrongText: '#F05252',
+  answerRightBg: '#0A1F17',
+  answerRightText: '#22C55E',
+  flame: '#FBBF24',
+  flip: '#FB923C',
+  heroFrom: '#7C3AED',
+  heroTo: '#A855F7',
+  weekFrom: '#F59E0B',
+  weekTo: '#F97316',
 };
 
-/** Une couleur par catégorie, de Débutant à Expert. */
+/** Une couleur par catégorie de révision, de Débutant à Expert. */
 export const levelColors = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6'];
+
+/** Couleurs des thèmes de mots (texte, fond et bordure en clair). */
+export const themeColors: Record<ThemeId, { main: string; soft: string; line: string }> = {
+  food: { main: '#16A34A', soft: '#F0FDF4', line: '#BBF7D0' },
+  clothes: { main: '#9333EA', soft: '#FAF5FF', line: '#E9D5FF' },
+  vehicles: { main: '#2563EB', soft: '#EFF6FF', line: '#BFDBFE' },
+  places: { main: '#EA580C', soft: '#FFF7ED', line: '#FED7AA' },
+  general: { main: '#0D9488', soft: '#F0FDFA', line: '#99F6E4' },
+};
 
 /** Le pilote d'animation natif n'existe pas sur le web. */
 export const NATIVE_DRIVER = Platform.OS !== 'web';
@@ -47,12 +84,12 @@ export const NATIVE_DRIVER = Platform.OS !== 'web';
 export function cardShadow(isDark: boolean): object {
   if (isDark) return {};
   return Platform.select({
-    web: { boxShadow: '0 10px 28px rgba(15, 23, 42, 0.10)' },
+    web: { boxShadow: '0 8px 24px rgba(15, 23, 42, 0.10)' },
     default: {
       shadowColor: '#0F172A',
       shadowOpacity: 0.1,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
       elevation: 5,
     },
   }) as object;
