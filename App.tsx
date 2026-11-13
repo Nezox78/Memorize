@@ -1,14 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsModal } from './src/components/SettingsModal';
 import { WORDS } from './src/data/words';
+import { Word, computeStats, dayStreak, pickWord } from './src/logic/engine';
+import { Challenge, submitChallengeScore, syncStats } from './src/online/api';
+import { useAccount } from './src/online/useAccount';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { HomeScreen, View_ } from './src/screens/HomeScreen';
 import { LearnScreen } from './src/screens/LearnScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 import { QuizScreen } from './src/screens/QuizScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { Colors, ThemeProvider, useStyles, useTheme } from './src/theme';
@@ -19,6 +23,7 @@ const TABS: { id: View_; label: string; icon: keyof typeof Ionicons.glyphMap }[]
   { id: 'learn', label: 'Cartes', icon: 'copy-outline' },
   { id: 'quiz', label: 'Quiz', icon: 'help-circle-outline' },
   { id: 'stats', label: 'Progrès', icon: 'trending-up-outline' },
+  { id: 'profile', label: 'Profil', icon: 'person-outline' },
 ];
 
 export default function App() {
@@ -39,6 +44,50 @@ function Root() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { progress, answer, finishSession, reset } = useProgress();
   const { settings, change } = useSettings();
+  const account = useAccount();
+  const [duel, setDuel] = useState<{ id: string; opponent: string; words: Word[] } | null>(null);
+
+  // Publie les statistiques locales pour le classement, peu après chaque changement.
+  const { userId, refreshProfile } = account;
+  const xp = (progress?.correct ?? 0) * 10;
+  useEffect(() => {
+    if (!userId || !progress) return;
+    const timer = setTimeout(() => {
+      syncStats(userId, {
+        xp,
+        words_learned: computeStats(WORDS, progress).learned,
+        streak: dayStreak(progress),
+      })
+        .then(refreshProfile)
+        .catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, xp, refreshProfile]);
+
+  const drawDuelWords = () => {
+    const drawn: string[] = [];
+    while (drawn.length < 10) drawn.push(pickWord(WORDS, progress!, drawn).french);
+    return drawn;
+  };
+
+  const playDuel = (challenge: Challenge) => {
+    const words = challenge.words
+      .map((french) => WORDS.find((word) => word.french === french))
+      .filter((word): word is Word => Boolean(word));
+    if (!words.length) return;
+    const other = challenge.challenger_id === userId ? challenge.opponent : challenge.challenger;
+    setDuel({ id: challenge.id, opponent: other?.username ?? 'Joueur', words });
+    setView('challenge');
+  };
+
+  const finishDuel = (score: number) => {
+    if (!duel) return;
+    finishSession();
+    submitChallengeScore(duel.id, score).catch(() =>
+      Alert.alert('Score non envoyé', 'Vérifiez votre connexion, puis rejouez le défi.'),
+    );
+  };
   // Changer la clé après une réinitialisation repart sur un nouveau paquet de cartes.
   const [resets, setResets] = useState(0);
 
@@ -92,6 +141,24 @@ function Root() {
                 />
               </View>
             )}
+            {view === 'profile' && (
+              <View style={styles.screen}>
+                <ProfileScreen account={account} drawWords={drawDuelWords} onPlay={playDuel} />
+              </View>
+            )}
+            {view === 'challenge' && duel && (
+              <View style={styles.screen}>
+                <QuizScreen
+                  key={duel.id}
+                  words={pool}
+                  progress={progress}
+                  onAnswer={answer}
+                  onFinish={finishDuel}
+                  onBack={() => setView('profile')}
+                  challenge={duel}
+                />
+              </View>
+            )}
             {view === 'stats' && (
               <View style={styles.screen}>
                 <StatsScreen progress={progress} onBack={home} />
@@ -112,7 +179,8 @@ function Root() {
 
         <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           {TABS.map(({ id, label, icon }) => {
-            const active = view === id || (id === 'home' && view === 'categories');
+            const active =
+              view === id || (id === 'home' && view === 'categories') || (id === 'profile' && view === 'challenge');
             const color = active ? colors.highlight : colors.muted;
             return (
               <Pressable
@@ -161,5 +229,5 @@ const makeStyles = (c: Colors) =>
       paddingTop: 10,
     },
     tab: { flex: 1, alignItems: 'center', gap: 4 },
-    tabLabel: { fontSize: 13, fontWeight: '600' },
+    tabLabel: { fontSize: 12, fontWeight: '600' },
   });

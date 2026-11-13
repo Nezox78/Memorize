@@ -15,6 +15,8 @@ type Props = {
   onAnswer: (word: Word, correct: boolean) => void;
   onFinish: (score: number) => void;
   onBack: () => void;
+  /** Défi entre amis : liste de mots imposée, sans vies. */
+  challenge?: { words: Word[]; opponent: string };
 };
 
 /** « To Eat  » et « eat » sont acceptés pour « to eat ». */
@@ -27,18 +29,20 @@ function normalize(text: string): string {
     .replace(/^to /, '');
 }
 
-export function QuizScreen({ words, progress, onAnswer, onFinish, onBack }: Props) {
+export function QuizScreen({ words, progress, onAnswer, onFinish, onBack, challenge }: Props) {
   const { colors } = useTheme();
   const styles = useStyles(makeStyles);
-  const [word, setWord] = useState(() => pickWord(words, progress));
   const [index, setIndex] = useState(0);
+  const [drawn, setWord] = useState(() => pickWord(words, progress));
+  const total = challenge ? challenge.words.length : QUESTIONS;
+  const word = challenge ? challenge.words[Math.min(index, total - 1)] : drawn;
   const [input, setInput] = useState('');
   const [result, setResult] = useState<boolean | null>(null);
   const [score, setScore] = useState({ correct: 0, wrong: 0, streak: 0 });
   const [finished, setFinished] = useState(false);
 
-  const lives = LIVES - score.wrong;
-  const lastQuestion = index + 1 === QUESTIONS || (result === false && lives <= 0);
+  const lives = challenge ? LIVES : LIVES - score.wrong;
+  const lastQuestion = index + 1 === total || (result === false && lives <= 0);
 
   const check = () => {
     if (result !== null || !input.trim()) return;
@@ -78,27 +82,29 @@ export function QuizScreen({ words, progress, onAnswer, onFinish, onBack }: Prop
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Header
-        title="Quiz"
-        subtitle={finished ? 'Terminé' : `Question ${index + 1} / ${QUESTIONS}`}
+        title={challenge ? `Défi contre ${challenge.opponent}` : 'Quiz'}
+        subtitle={finished ? 'Terminé' : `Question ${index + 1} / ${total}`}
         onBack={onBack}
         right={
-          <View style={styles.lives} accessibilityLabel={`${Math.max(lives, 0)} vies restantes`}>
+          challenge ? null : <View style={styles.lives} accessibilityLabel={`${Math.max(lives, 0)} vies restantes`}>
             <Ionicons name="heart-outline" size={26} color={colors.error} />
             <Text style={styles.livesText}>{Math.max(lives, 0)}</Text>
           </View>
         }
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <ProgressBar percent={(answered / QUESTIONS) * 100} color={colors.accent} />
+        <ProgressBar percent={(answered / total) * 100} color={colors.accent} />
 
         {finished ? (
           <View style={styles.panel}>
-            <Text style={styles.label}>{lives <= 0 ? 'Plus de vies !' : 'Quiz terminé'}</Text>
-            <Text style={styles.word}>
-              {score.correct} / {QUESTIONS}
+            <Text style={styles.label}>
+              {challenge ? 'Défi terminé' : lives <= 0 ? 'Plus de vies !' : 'Quiz terminé'}
             </Text>
-            <Pressable onPress={restart} accessibilityRole="button" style={styles.primary}>
-              <Text style={styles.primaryText}>Rejouer</Text>
+            <Text style={styles.word}>
+              {score.correct} / {total}
+            </Text>
+            <Pressable onPress={challenge ? onBack : restart} accessibilityRole="button" style={styles.primary}>
+              <Text style={styles.primaryText}>{challenge ? 'Voir mes défis' : 'Rejouer'}</Text>
             </Pressable>
           </View>
         ) : (

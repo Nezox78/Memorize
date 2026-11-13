@@ -8,7 +8,7 @@ import { Colors, useStyles, useTheme } from '../theme';
 
 export const DAILY_GOAL = 20;
 
-export type View_ = 'home' | 'learn' | 'quiz' | 'stats' | 'categories';
+export type View_ = 'home' | 'learn' | 'quiz' | 'stats' | 'categories' | 'profile' | 'challenge';
 
 type Props = {
   name: string;
@@ -135,7 +135,12 @@ export function HomeScreen({ name, progress, onOpen, onSettings }: Props) {
       <Link icon="book-open-variant" title="Statistiques détaillées" text="Suivez vos progrès en détail" onPress={() => onOpen('stats')} />
       <Link icon="school-outline" title="Mots à apprendre" text="Choisissez vos catégories préférées" onPress={() => onOpen('categories')} />
       <Link icon="help-circle-outline" title="Quiz" text="Écrivez la traduction de 10 mots" onPress={() => onOpen('quiz')} />
-      <Link icon="account-group-outline" title="Défis entre amis" text="Bientôt disponible" />
+      <Link
+        icon="account-group-outline"
+        title="Défis entre amis"
+        text="Classement en ligne et duels de vocabulaire"
+        onPress={() => onOpen('profile')}
+      />
     </ScrollView>
   );
 }
