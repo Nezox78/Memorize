@@ -20,6 +20,8 @@ export type Progress = {
   wrong: number;
   streak: number;
   bestStreak: number;
+  /** Nombre de réponses données par jour (clé AAAA-MM-JJ, heure locale). */
+  days: Record<string, number>;
 };
 
 export const EMPTY_PROGRESS: Progress = {
@@ -28,7 +30,26 @@ export const EMPTY_PROGRESS: Progress = {
   wrong: 0,
   streak: 0,
   bestStreak: 0,
+  days: {},
 };
+
+export function dayKey(date: Date): string {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Nombre de jours consécutifs avec au moins une réponse (aujourd'hui ou hier inclus). */
+export function dayStreak(progress: Progress, now: Date = new Date()): number {
+  const cursor = new Date(now);
+  if (!progress.days[dayKey(cursor)]) cursor.setDate(cursor.getDate() - 1);
+  let count = 0;
+  while (progress.days[dayKey(cursor)]) {
+    count++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return count;
+}
 
 export function levelOf(word: Word, progress: Progress): number {
   return progress.words[word.french]?.level ?? word.level;
@@ -64,7 +85,12 @@ export function pickWord(
 }
 
 /** Bonne réponse : le mot monte d'une catégorie ; mauvaise : il descend d'une. */
-export function applyAnswer(progress: Progress, word: Word, correct: boolean): Progress {
+export function applyAnswer(
+  progress: Progress,
+  word: Word,
+  correct: boolean,
+  day: string = dayKey(new Date()),
+): Progress {
   const current = progress.words[word.french] ?? { level: word.level, correct: 0, wrong: 0 };
   const level = Math.max(0, Math.min(MAX_LEVEL, current.level + (correct ? 1 : -1)));
   const streak = correct ? progress.streak + 1 : 0;
@@ -81,6 +107,7 @@ export function applyAnswer(progress: Progress, word: Word, correct: boolean): P
     wrong: progress.wrong + (correct ? 0 : 1),
     streak,
     bestStreak: Math.max(progress.bestStreak, streak),
+    days: { ...progress.days, [day]: (progress.days[day] ?? 0) + 1 },
   };
 }
 

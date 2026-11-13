@@ -1,11 +1,12 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Ref, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { LEVELS, Word } from '../logic/engine';
-import { NATIVE_DRIVER, colors, levelColors, shadow } from '../theme';
+import { Colors, NATIVE_DRIVER, cardShadow, levelColors, useStyles, useTheme } from '../theme';
 
 export type SwipeCardHandle = {
-  /** Déclenche le swipe par programme (boutons ✓ / ✗). */
+  /** Déclenche le swipe par programme (boutons Correct / Incorrect). */
   swipe: (correct: boolean) => void;
 };
 
@@ -20,6 +21,8 @@ type Props = {
 };
 
 export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref }: Props) {
+  const { colors, dark } = useTheme();
+  const styles = useStyles(makeStyles);
   const [revealed, setRevealed] = useState(false);
   const pan = useRef(new Animated.ValueXY()).current;
   const flip = useRef(new Animated.Value(1)).current;
@@ -35,6 +38,7 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
     Animated.spring(enter, { toValue: 1, friction: 7, useNativeDriver: NATIVE_DRIVER }).start();
   }, [enter]);
 
+  // La carte se referme sur sa tranche, change de face, puis se rouvre.
   const reveal = () => {
     if (live.current.revealed || live.current.locked) return;
     live.current.revealed = true;
@@ -96,7 +100,7 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
       {...responder.panHandlers}
       style={[
         styles.card,
-        shadow,
+        cardShadow(dark),
         { width, height },
         { transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }, { scale: enterScale }, { scaleX: flip }] },
       ]}
@@ -118,10 +122,10 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
       {revealed && (
         <>
           <Animated.View pointerEvents="none" style={[styles.tint, { backgroundColor: colors.success, opacity: yesOpacity }]}>
-            <Text style={styles.tintMark}>✔</Text>
+            <Ionicons name="checkmark" size={110} color="#FFFFFF" />
           </Animated.View>
           <Animated.View pointerEvents="none" style={[styles.tint, { backgroundColor: colors.error, opacity: noOpacity }]}>
-            <Text style={styles.tintMark}>✘</Text>
+            <Ionicons name="close" size={110} color="#FFFFFF" />
           </Animated.View>
         </>
       )}
@@ -131,6 +135,7 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
 
 /** Carte suivante, visible en retrait derrière la carte active. */
 export function BackCard({ word, level, width, height }: Pick<Props, 'word' | 'level' | 'width' | 'height'>) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={[styles.card, styles.backCard, { width, height }]}>
       <View style={styles.content}>
@@ -141,76 +146,82 @@ export function BackCard({ word, level, width, height }: Pick<Props, 'word' | 'l
 }
 
 function CardFace({ word, level, revealed }: { word: Word; level: number; revealed: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles(makeStyles);
   return (
     <>
-      <View style={[styles.badge, { backgroundColor: levelColors[level] }]}>
+      <View style={styles.badge}>
+        <View style={[styles.dot, { backgroundColor: levelColors[level] }]} />
         <Text style={styles.badgeText}>{LEVELS[level]}</Text>
       </View>
 
       <View style={styles.center}>
-        {revealed ? (
-          <>
-            <Text style={styles.small}>{word.french}</Text>
-            <Text style={[styles.main, styles.english]} adjustsFontSizeToFit numberOfLines={2}>
-              {word.english}
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.small}>Comment dit-on en anglais…</Text>
-            <Text style={styles.main} adjustsFontSizeToFit numberOfLines={2}>
-              {word.french}
-            </Text>
-          </>
-        )}
+        <Text style={styles.language}>{revealed ? 'ENGLISH' : 'FRANÇAIS'}</Text>
+        <Text style={[styles.main, revealed && { color: colors.accent }]} adjustsFontSizeToFit numberOfLines={2}>
+          {revealed ? word.english : word.french}
+        </Text>
+        {revealed && <Text style={styles.small}>{word.french}</Text>}
       </View>
 
-      <Text style={styles.hint}>
-        {revealed ? 'Tu avais la bonne réponse ? Swipe →  ·  Sinon ←' : 'Touche la carte pour voir la traduction'}
-      </Text>
+      <View style={styles.footer}>
+        <Text style={styles.hint}>
+          {revealed ? 'Swipe à droite si tu savais, à gauche sinon' : 'Touche la carte pour la retourner'}
+        </Text>
+        {!revealed && (
+          <View style={styles.flipIcon}>
+            <Ionicons name="refresh" size={18} color="#FFFFFF" />
+          </View>
+        )}
+      </View>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    position: 'absolute',
-    borderRadius: 28,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  backCard: {
-    transform: [{ scale: 0.94 }, { translateY: 18 }],
-    opacity: 0.7,
-  },
-  content: {
-    flex: 1,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  badgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
-  center: { alignItems: 'center', alignSelf: 'stretch', gap: 12 },
-  small: { fontSize: 16, color: colors.muted, textAlign: 'center' },
-  main: { fontSize: 40, fontWeight: '800', color: colors.text, textAlign: 'center' },
-  english: { color: colors.accent },
-  hint: { fontSize: 13, color: colors.muted, textAlign: 'center' },
-  tint: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tintMark: { fontSize: 96, color: '#FFFFFF', fontWeight: '800' },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    card: {
+      position: 'absolute',
+      borderRadius: 24,
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.border,
+      overflow: 'hidden',
+    },
+    backCard: { transform: [{ scale: 0.94 }, { translateY: 16 }], opacity: 0.6 },
+    content: { flex: 1, padding: 22, alignItems: 'center', justifyContent: 'space-between' },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'flex-start',
+      backgroundColor: c.accentSoft,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
+    dot: { width: 8, height: 8, borderRadius: 4 },
+    badgeText: { color: c.accent, fontSize: 12, fontWeight: '700' },
+    center: { alignItems: 'center', alignSelf: 'stretch', gap: 10 },
+    language: { fontSize: 12, letterSpacing: 1.5, color: c.muted, fontWeight: '600' },
+    main: { fontSize: 38, fontWeight: '800', color: c.text, textAlign: 'center' },
+    small: { fontSize: 16, color: c.muted, textAlign: 'center' },
+    footer: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', minHeight: 40 },
+    hint: { flex: 1, fontSize: 13, color: c.muted },
+    flipIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: c.warning,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tint: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });

@@ -4,36 +4,44 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HomeScreen } from './src/screens/HomeScreen';
 import { LearnScreen } from './src/screens/LearnScreen';
+import { QuizScreen } from './src/screens/QuizScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
-import { colors } from './src/theme';
+import { Colors, ThemeProvider, useStyles, useTheme } from './src/theme';
 import { useProgress } from './src/useProgress';
 
-type Tab = 'learn' | 'stats';
+type Tab = 'home' | 'learn' | 'quiz' | 'stats';
 
 const TABS: { id: Tab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'learn', label: 'Apprendre', icon: 'albums' },
-  { id: 'stats', label: 'Statistiques', icon: 'stats-chart' },
+  { id: 'home', label: 'Accueil', icon: 'home' },
+  { id: 'learn', label: 'Cartes', icon: 'copy' },
+  { id: 'quiz', label: 'Quiz', icon: 'help-circle' },
+  { id: 'stats', label: 'Progrès', icon: 'trending-up' },
 ];
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Root />
+      <ThemeProvider>
+        <Root />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 function Root() {
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>('learn');
+  const { colors, dark } = useTheme();
+  const styles = useStyles(makeStyles);
+  const [tab, setTab] = useState<Tab>('home');
   const { progress, answer, reset } = useProgress();
-  // Changer la clé après une réinitialisation retire un nouveau paquet de cartes.
+  // Changer la clé après une réinitialisation repart sur un nouveau paquet de cartes.
   const [resets, setResets] = useState(0);
 
   return (
     <View style={styles.root}>
+      <StatusBar style={dark ? 'light' : 'dark'} />
       <View style={[styles.app, { paddingTop: insets.top }]}>
         {progress === null ? (
           <View style={styles.loading}>
@@ -41,10 +49,18 @@ function Root() {
           </View>
         ) : (
           <>
-            {/* L'écran Apprendre reste monté pour conserver la carte en cours. */}
+            {/* Cartes et Quiz restent montés pour conserver la partie en cours. */}
             <View style={[styles.screen, tab !== 'learn' && styles.hidden]}>
               <LearnScreen key={resets} progress={progress} onAnswer={answer} />
             </View>
+            <View style={[styles.screen, tab !== 'quiz' && styles.hidden]}>
+              <QuizScreen key={resets} progress={progress} onAnswer={answer} />
+            </View>
+            {tab === 'home' && (
+              <View style={styles.screen}>
+                <HomeScreen progress={progress} onOpen={setTab} />
+              </View>
+            )}
             {tab === 'stats' && (
               <View style={styles.screen}>
                 <StatsScreen
@@ -69,6 +85,7 @@ function Root() {
                 style={styles.tab}
                 onPress={() => setTab(id)}
                 accessibilityRole="tab"
+                accessibilityLabel={label}
                 accessibilityState={{ selected: active }}
               >
                 <Ionicons name={active ? icon : (`${icon}-outline` as typeof icon)} size={22} color={color} />
@@ -82,20 +99,21 @@ function Root() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, alignItems: 'center' },
-  // Largeur plafonnée pour rester agréable sur tablette et sur le web.
-  app: { flex: 1, width: '100%', maxWidth: 520 },
-  screen: { flex: 1 },
-  hidden: { display: 'none' },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.card,
-    paddingTop: 8,
-  },
-  tab: { flex: 1, alignItems: 'center', gap: 2 },
-  tabLabel: { fontSize: 11, fontWeight: '600' },
-});
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.background, alignItems: 'center' },
+    // Largeur plafonnée pour rester agréable sur tablette et sur le web.
+    app: { flex: 1, width: '100%', maxWidth: 520 },
+    screen: { flex: 1 },
+    hidden: { display: 'none' },
+    loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    tabBar: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+      backgroundColor: c.card,
+      paddingTop: 8,
+    },
+    tab: { flex: 1, alignItems: 'center', gap: 2 },
+    tabLabel: { fontSize: 11, fontWeight: '600' },
+  });
