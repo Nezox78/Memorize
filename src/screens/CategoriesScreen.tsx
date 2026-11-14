@@ -1,24 +1,29 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ThemeId } from '../logic/engine';
 import { Colors, themeLook, useStyles, useTheme } from '../theme';
 import { useWords } from '../words';
 
-const ICONS: Record<ThemeId, keyof typeof MaterialCommunityIcons.glyphMap> = {
+const ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
   Animaux: 'paw-outline',
   Sport: 'soccer',
   'Pays/Continents': 'earth',
-  food: 'food-apple-outline',
-  clothes: 'tshirt-crew-outline',
-  vehicles: 'car-outline',
-  places: 'office-building-outline',
-  general: 'book-open-variant',
+  Aliments: 'food-apple-outline',
+  Vêtements: 'tshirt-crew-outline',
+  Véhicules: 'car-outline',
+};
+
+const TEXTS: Record<string, string> = {
+  Animaux: 'Animaux domestiques, sauvages, de la ferme…',
+  Sport: 'Disciplines, équipements, compétitions…',
+  'Pays/Continents': 'Pays, continents, régions du monde…',
 };
 
 type Props = {
-  selected: ThemeId[];
-  onChange: (themes: ThemeId[]) => void;
+  /** Tables cochées. */
+  selected: string[];
+  onChange: (tables: string[]) => void;
   onStart: () => void;
   onBack: () => void;
 };
@@ -26,11 +31,38 @@ type Props = {
 export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
-  const { words: allWords, themes } = useWords();
+  const { catalog, downloaded, download } = useWords();
+  const [busy, setBusy] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const count = selected.length;
 
-  const toggle = (id: ThemeId) =>
-    onChange(selected.includes(id) ? selected.filter((theme) => theme !== id) : [...selected, id]);
+  // Cocher une catégorie télécharge ses mots sur l'appareil ; ils arrivent en Débutant.
+  const check = async (tables: string[]) => {
+    setError(null);
+    setBusy((current) => [...current, ...tables]);
+    const done: string[] = [];
+    for (const table of tables) {
+      if (await download(table)) done.push(table);
+    }
+    setBusy((current) => current.filter((table) => !tables.includes(table)));
+    if (done.length < tables.length) {
+      setError('Téléchargement impossible. Vérifiez votre connexion à Internet, puis réessayez.');
+    }
+    return done;
+  };
+
+  const toggle = async (table: string) => {
+    if (busy.includes(table)) return;
+    if (selected.includes(table)) return onChange(selected.filter((item) => item !== table));
+    const done = await check([table]);
+    if (done.length) onChange([...selected, table]);
+  };
+
+  const selectAll = async () => {
+    const missing = catalog.map((item) => item.table).filter((table) => !selected.includes(table));
+    const done = await check(missing);
+    onChange([...selected, ...done]);
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -45,17 +77,19 @@ export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props)
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {themes.map((theme, index) => {
-          const look = themeLook(theme.id, index);
-          const active = selected.includes(theme.id);
-          const words = allWords.filter((word) => word.theme === theme.id).length;
+        {catalog.map((category, index) => {
+          const look = themeLook(category.theme, index);
+          const active = selected.includes(category.table);
+          const loading = busy.includes(category.table);
+          const onDevice = downloaded.includes(category.table);
           return (
             <Pressable
-              key={theme.id}
-              onPress={() => toggle(theme.id)}
+              key={category.table}
+              onPress={() => toggle(category.table)}
               accessibilityRole="checkbox"
-              accessibilityLabel={theme.name}
-              accessibilityState={{ checked: active }}
+              accessibilityLabel={category.theme}
+              aria-checked={active}
+              accessibilityState={{ busy: loading }}
               style={[
                 styles.row,
                 active && {
@@ -64,21 +98,32 @@ export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props)
                 },
               ]}
             >
-              <MaterialCommunityIcons name={ICONS[theme.id] ?? 'tag-outline'} size={30} color={look.main} />
+              <MaterialCommunityIcons name={ICONS[category.theme] ?? 'tag-outline'} size={30} color={look.main} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{theme.name}</Text>
+                <Text style={styles.rowTitle}>{category.theme}</Text>
                 <Text style={styles.caption} numberOfLines={2}>
-                  {theme.text} {words} mots
+                  {TEXTS[category.theme] ?? 'Mots à apprendre…'}
+                </Text>
+                <Text style={[styles.status, { color: onDevice ? look.main : colors.muted }]}>
+                  {loading
+                    ? 'Téléchargement…'
+                    : `${category.count ? `${category.count} mots` : 'Mots'} · ${onDevice ? 'sur cet appareil' : 'à télécharger'}`}
                 </Text>
               </View>
-              <Ionicons
-                name={active ? 'checkmark-circle-outline' : 'ellipse-outline'}
-                size={30}
-                color={active ? look.main : colors.border}
-              />
+              {loading ? (
+                <ActivityIndicator color={look.main} />
+              ) : (
+                <Ionicons
+                  name={active ? 'checkmark-circle-outline' : 'ellipse-outline'}
+                  size={30}
+                  color={active ? look.main : colors.border}
+                />
+              )}
             </Pressable>
           );
         })}
+
+        {error && <Text style={styles.error}>{error}</Text>}
 
         <View style={styles.count}>
           <Text style={styles.caption}>
@@ -100,7 +145,7 @@ export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props)
         </Pressable>
 
         <View style={styles.pair}>
-          <Pressable onPress={() => onChange(themes.map((theme) => theme.id))} accessibilityRole="button" style={styles.outline}>
+          <Pressable onPress={selectAll} accessibilityRole="button" style={styles.outline}>
             <Text style={styles.outlineText}>Tout sélectionner</Text>
           </Pressable>
           <Pressable onPress={() => onChange([])} accessibilityRole="button" style={styles.outline}>
@@ -111,8 +156,9 @@ export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props)
         <View style={styles.tip}>
           <Text style={styles.tipTitle}>💡  Conseil</Text>
           <Text style={styles.tipText}>
-            Commencez par une ou deux catégories pour des sessions plus ciblées, puis ajoutez progressivement
-            d'autres thèmes pour diversifier votre vocabulaire.
+            Cocher une catégorie télécharge ses mots sur votre téléphone : ils arrivent tous en « Débutant » et
+            montent d'un niveau à chaque bonne réponse. Décocher une catégorie ne fait pas perdre le niveau de ses
+            mots.
           </Text>
         </View>
       </ScrollView>
@@ -149,6 +195,8 @@ const makeStyles = (c: Colors) =>
     },
     rowTitle: { fontSize: 18, fontWeight: '700', color: c.text },
     caption: { fontSize: 15, color: c.muted },
+    status: { fontSize: 13, fontWeight: '600', marginTop: 4 },
+    error: { color: c.error, fontSize: 14, fontWeight: '600', textAlign: 'center' },
     count: {
       padding: 20,
       borderRadius: 12,

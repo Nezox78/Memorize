@@ -63,7 +63,7 @@ export function QuizScreen({ words, progress, onAnswer, onFinish, onBack, challe
       return;
     }
     setIndex((i) => i + 1);
-    setWord(pickWord(words, progress, [word.french]));
+    setWord(pickWord(words, progress, [word.id]));
     setInput('');
     setResult(null);
   };
@@ -71,7 +71,7 @@ export function QuizScreen({ words, progress, onAnswer, onFinish, onBack, challe
   const restart = () => {
     setIndex(0);
     setScore({ correct: 0, wrong: 0, streak: 0 });
-    setWord(pickWord(words, progress, [word.french]));
+    setWord(pickWord(words, progress, [word.id]));
     setInput('');
     setResult(null);
     setFinished(false);

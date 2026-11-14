@@ -8,17 +8,20 @@ export const WEIGHTS = [40, 30, 15, 10, 5];
 export type ThemeId = string;
 
 export type Word = {
+  /** Identifiant stable : table d'origine + mot français. Sert de clé à la progression. */
+  id: string;
   french: string;
   english: string;
-  /** Niveau de départ du mot (index dans LEVELS). */
+  /** Niveau de départ : un mot téléchargé commence toujours en Débutant (0). */
   level: number;
+  /** Catégorie de mots (Animaux, Sport…). */
   theme: ThemeId;
 };
 
 export type WordProgress = { level: number; correct: number; wrong: number };
 
 export type Progress = {
-  /** Uniquement les mots déjà joués, indexés par leur version française. */
+  /** Niveau de chaque mot déjà joué, indexé par son identifiant. Jamais effacé. */
   words: Record<string, WordProgress>;
   correct: number;
   wrong: number;
@@ -89,7 +92,7 @@ export function bestDayStreak(progress: Progress): number {
 }
 
 export function levelOf(word: Word, progress: Progress): number {
-  return progress.words[word.french]?.level ?? word.level;
+  return progress.words[word.id]?.level ?? word.level;
 }
 
 /**
@@ -105,7 +108,7 @@ export function pickWord(
 ): Word {
   const buckets: Word[][] = LEVELS.map(() => []);
   for (const word of words) {
-    if (!exclude.includes(word.french)) buckets[levelOf(word, progress)].push(word);
+    if (!exclude.includes(word.id)) buckets[levelOf(word, progress)].push(word);
   }
 
   const total = buckets.reduce((sum, bucket, i) => sum + (bucket.length ? WEIGHTS[i] : 0), 0);
@@ -128,14 +131,14 @@ export function applyAnswer(
   correct: boolean,
   day: string = dayKey(new Date()),
 ): Progress {
-  const current = progress.words[word.french] ?? { level: word.level, correct: 0, wrong: 0 };
+  const current = progress.words[word.id] ?? { level: word.level, correct: 0, wrong: 0 };
   const level = Math.max(0, Math.min(MAX_LEVEL, current.level + (correct ? 1 : -1)));
   const streak = correct ? progress.streak + 1 : 0;
   return {
     ...progress,
     words: {
       ...progress.words,
-      [word.french]: {
+      [word.id]: {
         level,
         correct: current.correct + (correct ? 1 : 0),
         wrong: current.wrong + (correct ? 0 : 1),
@@ -154,27 +157,21 @@ export type Stats = {
   answers: number;
   /** Taux de réussite en %, 0 tant qu'aucune réponse n'a été donnée. */
   successRate: number;
-  /** Mots amenés au niveau Expert par une bonne réponse. */
+  /** Mots arrivés au niveau Expert. */
   learned: number;
-  /** Mots déjà vus au moins une fois. */
+  /** Mots déjà joués au moins une fois. */
   seen: number;
   /** Nombre de mots actuellement dans chaque catégorie. */
   perLevel: number[];
-  /** Par catégorie de départ : mots au total, et mots qui ont progressé depuis. */
-  perStart: { total: number; improved: number }[];
 };
 
 export function computeStats(words: Word[], progress: Progress): Stats {
   const perLevel = LEVELS.map(() => 0);
-  const perStart = LEVELS.map(() => ({ total: 0, improved: 0 }));
   let learned = 0;
   for (const word of words) {
     const level = levelOf(word, progress);
-    const knownAtTop = level === MAX_LEVEL && (progress.words[word.french]?.correct ?? 0) > 0;
     perLevel[level]++;
-    perStart[word.level].total++;
-    if (level > word.level || knownAtTop) perStart[word.level].improved++;
-    if (knownAtTop) learned++;
+    if (level === MAX_LEVEL) learned++;
   }
   const answers = progress.correct + progress.wrong;
   return {
@@ -182,8 +179,7 @@ export function computeStats(words: Word[], progress: Progress): Stats {
     answers,
     successRate: answers ? Math.round((progress.correct / answers) * 100) : 0,
     learned,
-    seen: Object.keys(progress.words).length,
+    seen: words.filter((word) => progress.words[word.id]).length,
     perLevel,
-    perStart,
   };
 }

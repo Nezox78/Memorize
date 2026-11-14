@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Challenge, Profile, createChallenge, fetchChallenges, fetchLeaderboard } from '../online/api';
+import { Challenge, DuelWord, Profile, createChallenge, fetchChallenges, fetchLeaderboard } from '../online/api';
 import { Account } from '../online/useAccount';
 import { Colors, useStyles, useTheme } from '../theme';
 
 type Props = {
   account: Account;
-  /** Tire les mots d'un nouveau défi (versions françaises). */
-  drawWords: () => string[];
+  /** Tire les mots d'un nouveau défi ; liste vide si aucune catégorie n'est cochée. */
+  drawWords: () => DuelWord[];
   onPlay: (challenge: Challenge) => void;
 };
 
@@ -187,7 +187,9 @@ function Online({ account, drawWords, onPlay }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const created = await createChallenge(me, friend, drawWords());
+      const words = drawWords();
+      if (!words.length) throw new Error("Cochez d'abord au moins une catégorie de mots.");
+      const created = await createChallenge(me, friend, words);
       setFriend('');
       onPlay(created);
     } catch (e) {

@@ -25,9 +25,8 @@ export function LearnScreen({ words, progress, onAnswer, onFinish, onBack, onSet
   const styles = useStyles(makeStyles);
   const [deck, setDeck] = useState(() => {
     const current = pickWord(words, progress);
-    return { current, next: pickWord(words, progress, [current.french]), turn: 0 };
+    return { current, next: pickWord(words, progress, [current.id]), turn: 0 };
   });
-  const [revealed, setRevealed] = useState(false);
   const [area, setArea] = useState({ width: 0, height: 0 });
   const [session, setSession] = useState({ correct: 0, wrong: 0 });
   const [finished, setFinished] = useState(false);
@@ -45,7 +44,6 @@ export function LearnScreen({ words, progress, onAnswer, onFinish, onBack, onSet
 
   const restart = () => {
     setSession({ correct: 0, wrong: 0 });
-    setRevealed(false);
     setFinished(false);
   };
 
@@ -59,10 +57,9 @@ export function LearnScreen({ words, progress, onAnswer, onFinish, onBack, onSet
     setSession((s) => ({ correct: s.correct + (correct ? 1 : 0), wrong: s.wrong + (correct ? 0 : 1) }));
 
     // Le mot suivant est déjà tiré ; on prépare celui d'après en évitant les deux à l'écran.
-    setRevealed(false);
     setDeck((d) => ({
       current: d.next,
-      next: pickWord(words, progress, [d.current.french, d.next.french]),
+      next: pickWord(words, progress, [d.current.id, d.next.id]),
       turn: d.turn + 1,
     }));
     if (answered + 1 >= SESSION_LENGTH) finish();
@@ -125,7 +122,6 @@ export function LearnScreen({ words, progress, onAnswer, onFinish, onBack, onSet
               level={levelOf(deck.current, progress)}
               width={cardWidth}
               height={cardHeight}
-              onReveal={() => setRevealed(true)}
               onSwiped={handleSwiped}
             />
           </>
@@ -139,7 +135,6 @@ export function LearnScreen({ words, progress, onAnswer, onFinish, onBack, onSet
           icon="close"
           background={colors.answerWrongBg}
           color={colors.answerWrongText}
-          disabled={!revealed}
           onPress={() => card.current?.swipe(false)}
         />
         <ActionButton
@@ -148,7 +143,6 @@ export function LearnScreen({ words, progress, onAnswer, onFinish, onBack, onSet
           icon="checkmark"
           background={colors.answerRightBg}
           color={colors.answerRightText}
-          disabled={!revealed}
           onPress={() => card.current?.swipe(true)}
         />
       </View>
@@ -174,7 +168,6 @@ function ActionButton(props: {
   icon: 'close' | 'checkmark';
   background: string;
   color: string;
-  disabled: boolean;
   onPress: () => void;
 }) {
   const styles = useStyles(makeStyles);
@@ -182,11 +175,10 @@ function ActionButton(props: {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={props.label}
-      disabled={props.disabled}
       onPress={props.onPress}
       style={({ pressed }) => [
         styles.action,
-        { backgroundColor: props.background, opacity: props.disabled ? 0.45 : pressed ? 0.75 : 1 },
+        { backgroundColor: props.background, opacity: pressed ? 0.75 : 1 },
       ]}
     >
       <Ionicons name={props.icon} size={20} color={props.color} />

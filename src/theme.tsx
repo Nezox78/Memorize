@@ -69,23 +69,25 @@ const dark: Colors = {
 /** Une couleur par catégorie de révision, de Débutant à Expert. */
 export const levelColors = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6'];
 
-/** Couleurs des thèmes de mots (texte, fond et bordure en clair). */
+/** Couleurs des catégories de mots connues (texte, fond et bordure en clair). */
 const themeColors: Record<ThemeId, { main: string; soft: string; line: string }> = {
-  food: { main: '#16A34A', soft: '#F0FDF4', line: '#BBF7D0' },
-  clothes: { main: '#9333EA', soft: '#FAF5FF', line: '#E9D5FF' },
-  vehicles: { main: '#2563EB', soft: '#EFF6FF', line: '#BFDBFE' },
-  places: { main: '#EA580C', soft: '#FFF7ED', line: '#FED7AA' },
-  general: { main: '#0D9488', soft: '#F0FDFA', line: '#99F6E4' },
+  Animaux: { main: '#16A34A', soft: '#F0FDF4', line: '#BBF7D0' },
+  Sport: { main: '#2563EB', soft: '#EFF6FF', line: '#BFDBFE' },
+  'Pays/Continents': { main: '#EA580C', soft: '#FFF7ED', line: '#FED7AA' },
+  Aliments: { main: '#DC2626', soft: '#FEF2F2', line: '#FECACA' },
+  Vêtements: { main: '#9333EA', soft: '#FAF5FF', line: '#E9D5FF' },
+  Véhicules: { main: '#0D9488', soft: '#F0FDFA', line: '#99F6E4' },
 };
 
 const extraThemeColors = [
-  { main: '#DC2626', soft: '#FEF2F2', line: '#FECACA' },
+  { main: '#9333EA', soft: '#FAF5FF', line: '#E9D5FF' },
+  { main: '#0D9488', soft: '#F0FDFA', line: '#99F6E4' },
   { main: '#CA8A04', soft: '#FEFCE8', line: '#FEF08A' },
   { main: '#DB2777', soft: '#FDF2F8', line: '#FBCFE8' },
   { main: '#4F46E5', soft: '#EEF2FF', line: '#C7D2FE' },
 ];
 
-/** Couleurs d'un thème ; les thèmes inconnus piochent dans une palette de secours. */
+/** Couleurs d'une catégorie ; les catégories inconnues piochent dans une palette de secours. */
 export function themeLook(id: ThemeId, index: number) {
   return themeColors[id] ?? extraThemeColors[index % extraThemeColors.length];
 }

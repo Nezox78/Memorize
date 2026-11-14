@@ -3,20 +3,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Header, ProgressBar } from '../components/ui';
-import { LEVELS, Progress, bestDayStreak, computeStats, currentWeek, dayStreak } from '../logic/engine';
+import { LEVELS, Progress, Word, bestDayStreak, computeStats, currentWeek, dayStreak } from '../logic/engine';
 import { Colors, levelColors, useStyles, useTheme } from '../theme';
-import { useWords } from '../words';
 
 export const WEEKLY_GOAL = 100;
 
 const WEEK = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-type Props = { progress: Progress; onBack: () => void };
+type Props = { words: Word[]; progress: Progress; onBack: () => void };
 
-export function StatsScreen({ progress, onBack }: Props) {
+export function StatsScreen({ words, progress, onBack }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
-  const { words } = useWords();
   const stats = computeStats(words, progress);
   const week = currentWeek();
   const weekCount = week.reduce((sum, key) => sum + (progress.days[key] ?? 0), 0);
@@ -115,7 +113,7 @@ export function StatsScreen({ progress, onBack }: Props) {
 
         <Text style={styles.section}>Catégories de révision</Text>
         {LEVELS.map((name, i) => {
-          const share = Math.round((stats.perLevel[i] / stats.total) * 100);
+          const share = stats.total ? Math.round((stats.perLevel[i] / stats.total) * 100) : 0;
           return (
             <View key={name} style={styles.level}>
               <View style={styles.levelIcon}>

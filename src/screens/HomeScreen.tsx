@@ -2,9 +2,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { LEVELS, Progress, computeStats, dayKey, dayStreak } from '../logic/engine';
+import { LEVELS, Progress, Word, computeStats, dayKey, dayStreak } from '../logic/engine';
 import { Colors, useStyles, useTheme } from '../theme';
-import { useWords } from '../words';
 
 export const DAILY_GOAL = 20;
 
@@ -12,6 +11,8 @@ export type View_ = 'home' | 'learn' | 'quiz' | 'stats' | 'categories' | 'profil
 
 type Props = {
   name: string;
+  /** Mots des catégories cochées. */
+  words: Word[];
   progress: Progress;
   onOpen: (view: View_) => void;
   onSettings: () => void;
@@ -25,11 +26,11 @@ const LEVEL_ICONS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; color: 
   { icon: 'trophy-outline', color: '#EA580C', soft: '#FFEDD5' },
 ];
 
-export function HomeScreen({ name, progress, onOpen, onSettings }: Props) {
+export function HomeScreen({ name, words, progress, onOpen, onSettings }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
-  const { words } = useWords();
   const stats = computeStats(words, progress);
+  const empty = words.length === 0;
   const today = progress.days[dayKey(new Date())] ?? 0;
   const todayPercent = Math.round((today / DAILY_GOAL) * 100);
 
@@ -78,15 +79,19 @@ export function HomeScreen({ name, progress, onOpen, onSettings }: Props) {
       <View style={styles.panel}>
         <View style={styles.inline}>
           <MaterialCommunityIcons name="brain" size={24} color={colors.accent} />
-          <Text style={styles.panelTitle}>Commencer une révision</Text>
+          <Text style={styles.panelTitle}>{empty ? 'Choisissez vos mots' : 'Commencer une révision'}</Text>
         </View>
-        <Text style={styles.caption}>Révisez votre vocabulaire avec des cartes interactives</Text>
+        <Text style={styles.caption}>
+          {empty
+            ? 'Cochez les catégories de mots à apprendre : elles seront téléchargées sur votre téléphone.'
+            : 'Révisez votre vocabulaire avec des cartes interactives'}
+        </Text>
         <Pressable
-          onPress={() => onOpen('learn')}
+          onPress={() => onOpen(empty ? 'categories' : 'learn')}
           accessibilityRole="button"
           style={({ pressed }) => [styles.primary, pressed && { opacity: 0.8 }]}
         >
-          <Text style={styles.primaryText}>Commencer maintenant</Text>
+          <Text style={styles.primaryText}>{empty ? 'Choisir mes catégories' : 'Commencer maintenant'}</Text>
         </Pressable>
       </View>
 
@@ -102,9 +107,9 @@ export function HomeScreen({ name, progress, onOpen, onSettings }: Props) {
         </View>
       </View>
 
-      <Text style={styles.section}>Catégories</Text>
+      <Text style={styles.section}>Niveaux</Text>
       {LEVELS.map((level, i) => {
-        const { total, improved } = stats.perStart[i];
+        const inLevel = stats.perLevel[i];
         const look = LEVEL_ICONS[i];
         return (
           <Pressable
@@ -119,12 +124,12 @@ export function HomeScreen({ name, progress, onOpen, onSettings }: Props) {
             <View style={{ flex: 1 }}>
               <Text style={styles.rowTitle}>{level}</Text>
               <Text style={styles.caption}>
-                {improved}/{total} mots
+                Catégorie {i + 1} · {inLevel} mot{inLevel > 1 ? 's' : ''}
               </Text>
             </View>
             <View style={[styles.rowPercent, { backgroundColor: dark ? `${look.color}26` : look.soft }]}>
               <Text style={[styles.rowPercentText, { color: look.color }]}>
-                {Math.round((improved / total) * 100)}%
+                {stats.total ? Math.round((inLevel / stats.total) * 100) : 0}%
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />

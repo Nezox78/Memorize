@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { EMPTY_PROGRESS, Progress, ThemeId, Word, applyAnswer } from './logic/engine';
+import { EMPTY_PROGRESS, Progress, Word, applyAnswer } from './logic/engine';
 
 const PROGRESS_KEY = 'memorize.progress.v1';
-const SETTINGS_KEY = 'memorize.settings.v1';
+const SETTINGS_KEY = 'memorize.settings.v2';
 
 /** Progression de l'utilisateur, chargée puis sauvegardée sur l'appareil. */
 export function useProgress() {
@@ -50,21 +50,23 @@ export function useProgress() {
   return { progress, answer, finishSession, reset };
 }
 
-/** `excluded` : thèmes décochés. Un nouveau thème de la base est donc actif par défaut. */
-export type Settings = { name: string; excluded: ThemeId[] };
+/** `selected` : catégories de mots cochées (noms de tables de la base). */
+export type Settings = { name: string; selected: string[] };
 
-const DEFAULT_SETTINGS: Settings = { name: '', excluded: [] };
+const DEFAULT_SETTINGS: Settings = { name: '', selected: [] };
 
-/** Prénom et thèmes de mots écartés, sauvegardés sur l'appareil. */
+/** Prénom et catégories de mots cochées, sauvegardés sur l'appareil. */
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(SETTINGS_KEY)
       .then((raw) => {
         if (raw) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoaded(true));
   }, []);
 
   const change = useCallback((patch: Partial<Settings>) => {
@@ -75,5 +77,5 @@ export function useSettings() {
     });
   }, []);
 
-  return { settings, change };
+  return { settings, loaded, change };
 }

@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Speech from 'expo-speech';
 import { Ref, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { LEVELS, Word } from '../logic/engine';
+import { speakEnglish } from '../speak';
 import { Colors, NATIVE_DRIVER, cardShadow, useStyles, useTheme } from '../theme';
 
 export type SwipeCardHandle = {
@@ -16,12 +16,11 @@ type Props = {
   level: number;
   width: number;
   height: number;
-  onReveal: () => void;
   onSwiped: (correct: boolean) => void;
   ref?: Ref<SwipeCardHandle>;
 };
 
-export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref }: Props) {
+export function SwipeCard({ word, level, width, height, onSwiped, ref }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
   const [revealed, setRevealed] = useState(false);
@@ -30,8 +29,7 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
   const enter = useRef(new Animated.Value(0)).current;
 
   // Le PanResponder est créé une seule fois : il lit l'état courant via cette ref.
-  const live = useRef({ revealed, locked: false, width, onSwiped });
-  live.current.revealed = revealed;
+  const live = useRef({ flipping: false, locked: false, width, onSwiped });
   live.current.width = width;
   live.current.onSwiped = onSwiped;
 
@@ -39,13 +37,13 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
     Animated.spring(enter, { toValue: 1, friction: 7, useNativeDriver: NATIVE_DRIVER }).start();
   }, [enter]);
 
-  // La carte se referme sur sa tranche, change de face, puis se rouvre.
-  const reveal = () => {
-    if (live.current.revealed || live.current.locked) return;
-    live.current.revealed = true;
+  // Chaque tap retourne la carte : elle se referme sur sa tranche, change de face, puis se rouvre.
+  const flipCard = () => {
+    if (live.current.flipping || live.current.locked) return;
+    live.current.flipping = true;
     Animated.timing(flip, { toValue: 0, duration: 130, useNativeDriver: NATIVE_DRIVER }).start(() => {
-      setRevealed(true);
-      onReveal();
+      setRevealed((shown) => !shown);
+      live.current.flipping = false;
       Animated.spring(flip, { toValue: 1, friction: 6, useNativeDriver: NATIVE_DRIVER }).start();
     });
   };
@@ -64,9 +62,7 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
     Animated.spring(pan, { toValue: { x: 0, y: 0 }, friction: 6, useNativeDriver: NATIVE_DRIVER }).start();
 
   useImperativeHandle(ref, () => ({
-    swipe: (correct) => {
-      if (live.current.revealed) fling(correct);
-    },
+    swipe: (correct) => fling(correct),
   }));
 
   const responder = useRef(
@@ -74,14 +70,12 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
       onMoveShouldSetPanResponder: (_, g) =>
         !live.current.locked && Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy),
       onPanResponderMove: (_, g) => {
-        // Tant que la traduction est cachée, la carte résiste au swipe.
-        const free = live.current.revealed;
-        pan.setValue({ x: free ? g.dx : g.dx * 0.2, y: free ? g.dy * 0.3 : 0 });
+        pan.setValue({ x: g.dx, y: g.dy * 0.3 });
       },
       onPanResponderRelease: (_, g) => {
         const far = Math.abs(g.dx) > live.current.width * 0.3;
         const fast = Math.abs(g.vx) > 0.8 && Math.abs(g.dx) > 40;
-        if (live.current.revealed && (far || fast)) fling(g.dx > 0, g.vy);
+        if (far || fast) fling(g.dx > 0, g.vy);
         else springBack();
       },
       onPanResponderTerminate: springBack,
@@ -108,7 +102,7 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
     >
       <Pressable
         style={styles.content}
-        onPress={reveal}
+        onPress={flipCard}
         accessibilityRole="button"
         accessibilityLabel={
           revealed
@@ -121,7 +115,7 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
 
       {revealed ? (
         <Pressable
-          onPress={() => Speech.speak(word.english, { language: 'en-US' })}
+          onPress={() => speakEnglish(word.english)}
           accessibilityRole="button"
           accessibilityLabel="Écouter la prononciation"
           hitSlop={12}
@@ -135,17 +129,12 @@ export function SwipeCard({ word, level, width, height, onReveal, onSwiped, ref 
         </View>
       )}
 
-      {/* Le retour vert / rouge n'apparaît qu'une fois la traduction révélée. */}
-      {revealed && (
-        <>
-          <Animated.View pointerEvents="none" style={[styles.tint, { backgroundColor: colors.success, opacity: yesOpacity }]}>
-            <Ionicons name="checkmark" size={110} color="#FFFFFF" />
-          </Animated.View>
-          <Animated.View pointerEvents="none" style={[styles.tint, { backgroundColor: colors.error, opacity: noOpacity }]}>
-            <Ionicons name="close" size={110} color="#FFFFFF" />
-          </Animated.View>
-        </>
-      )}
+      <Animated.View pointerEvents="none" style={[styles.tint, { backgroundColor: colors.success, opacity: yesOpacity }]}>
+        <Ionicons name="checkmark" size={110} color="#FFFFFF" />
+      </Animated.View>
+      <Animated.View pointerEvents="none" style={[styles.tint, { backgroundColor: colors.error, opacity: noOpacity }]}>
+        <Ionicons name="close" size={110} color="#FFFFFF" />
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -170,7 +159,7 @@ function CardFace({ word, level, revealed }: { word: Word; level: number; reveal
       <Text style={styles.main} adjustsFontSizeToFit numberOfLines={2}>
         {revealed ? word.english : word.french}
       </Text>
-      <Text style={styles.hint}>{revealed ? word.french : 'Tapez pour voir la traduction'}</Text>
+      <Text style={styles.hint}>{revealed ? 'Tapez pour revoir le mot français' : 'Tapez pour voir la traduction'}</Text>
       <View style={styles.pill}>
         <Text style={styles.pillText}>{LEVELS[level]}</Text>
       </View>

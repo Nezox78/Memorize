@@ -2,11 +2,14 @@ import { supabase } from './supabase';
 
 export type Profile = { id: string; username: string; xp: number; words_learned: number; streak: number };
 
+/** Un mot de défi : il voyage avec sa traduction, l'adversaire n'ayant pas forcément la catégorie. */
+export type DuelWord = { id: string; french: string; english: string; theme: string };
+
 export type Challenge = {
   id: string;
   challenger_id: string;
   opponent_id: string;
-  words: string[];
+  words: DuelWord[];
   challenger_score: number | null;
   opponent_score: number | null;
   created_at: string;
@@ -65,7 +68,7 @@ export async function fetchChallenges(): Promise<Challenge[]> {
   return data as Challenge[];
 }
 
-export async function createChallenge(me: string, opponentUsername: string, words: string[]): Promise<Challenge> {
+export async function createChallenge(me: string, opponentUsername: string, words: DuelWord[]): Promise<Challenge> {
   const { data: found, error: lookupError } = await client()
     .from('profiles')
     .select('id')

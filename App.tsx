@@ -6,7 +6,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { SettingsModal } from './src/components/SettingsModal';
 import { Word, computeStats, dayStreak, pickWord } from './src/logic/engine';
-import { Challenge, submitChallengeScore, syncStats } from './src/online/api';
+import { Challenge, DuelWord, submitChallengeScore, syncStats } from './src/online/api';
 import { useAccount } from './src/online/useAccount';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { HomeScreen, View_ } from './src/screens/HomeScreen';
@@ -16,7 +16,7 @@ import { QuizScreen } from './src/screens/QuizScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { Colors, ThemeProvider, useStyles, useTheme } from './src/theme';
 import { useProgress, useSettings } from './src/useProgress';
-import { WordsProvider, useWords } from './src/words';
+import { WordsProvider, tableOf, useWords } from './src/words';
 
 const TABS: { id: View_; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'home', label: 'Accueil', icon: 'home-outline' },
@@ -45,9 +45,22 @@ function Root() {
   const [view, setView] = useState<View_>('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { progress, answer, finishSession, reset } = useProgress();
-  const { settings, change } = useSettings();
-  const { words: WORDS, themes } = useWords();
-  const selectedThemes = themes.map((theme) => theme.id).filter((id) => !settings.excluded.includes(id));
+  const { settings, loaded, change } = useSettings();
+  const { words: downloadedWords, ready } = useWords();
+  // Mots à réviser : ceux des catégories cochées. Les autres gardent leur niveau, sans être tirés.
+  const pool = useMemo(
+    () => downloadedWords.filter((word) => settings.selected.includes(tableOf(word))),
+    [downloadedWords, settings.selected],
+  );
+  const WORDS = pool;
+
+  // Premier lancement : on commence par le choix des catégories.
+  const [welcomed, setWelcomed] = useState(false);
+  useEffect(() => {
+    if (welcomed || !loaded || !ready) return;
+    setWelcomed(true);
+    if (settings.selected.length === 0) setView('categories');
+  }, [welcomed, loaded, ready, settings.selected.length]);
   const account = useAccount();
   const [duel, setDuel] = useState<{ id: string; opponent: string; words: Word[] } | null>(null);
 
@@ -70,15 +83,17 @@ function Root() {
   }, [userId, xp, refreshProfile]);
 
   const drawDuelWords = () => {
-    const drawn: string[] = [];
-    while (drawn.length < 10) drawn.push(pickWord(WORDS, progress!, drawn).french);
+    const drawn: DuelWord[] = [];
+    const size = Math.min(10, pool.length);
+    while (drawn.length < size) {
+      const { id, french, english, theme } = pickWord(pool, progress!, drawn.map((word) => word.id));
+      drawn.push({ id, french, english, theme });
+    }
     return drawn;
   };
 
   const playDuel = (challenge: Challenge) => {
-    const words = challenge.words
-      .map((french) => WORDS.find((word) => word.french === french))
-      .filter((word): word is Word => Boolean(word));
+    const words: Word[] = challenge.words.map((word) => ({ ...word, level: 0 }));
     if (!words.length) return;
     const other = challenge.challenger_id === userId ? challenge.opponent : challenge.challenger;
     setDuel({ id: challenge.id, opponent: other?.username ?? 'Joueur', words });
@@ -95,12 +110,11 @@ function Root() {
   // Changer la clé après une réinitialisation repart sur un nouveau paquet de cartes.
   const [resets, setResets] = useState(0);
 
-  // Mots des thèmes choisis ; tous les mots si aucun thème n'est sélectionné.
-  const pool = useMemo(() => {
-    const chosen = WORDS.filter((word) => !settings.excluded.includes(word.theme));
-    return chosen.length ? chosen : WORDS;
-  }, [WORDS, settings.excluded]);
-  const deckKey = `${resets}-${settings.excluded.join(',')}`;
+  const deckKey = `${resets}-${settings.selected.join(',')}-${pool.length}`;
+  // Un mot de défi ne change de niveau que s'il fait partie des mots de l'utilisateur.
+  const answerDuel = (word: Word, correct: boolean) => {
+    if (pool.some((item) => item.id === word.id)) answer(word, correct);
+  };
   const home = () => setView('home');
 
   return (
@@ -113,32 +127,50 @@ function Root() {
           </View>
         ) : (
           <>
-            {/* Cartes et Quiz restent montés pour conserver la partie en cours. */}
-            <View style={[styles.screen, view !== 'learn' && styles.hidden]}>
-              <LearnScreen
-                key={deckKey}
-                words={pool}
-                progress={progress}
-                onAnswer={answer}
-                onFinish={() => finishSession()}
-                onBack={home}
-                onSettings={() => setSettingsOpen(true)}
-              />
-            </View>
-            <View style={[styles.screen, view !== 'quiz' && styles.hidden]}>
-              <QuizScreen
-                key={deckKey}
-                words={pool}
-                progress={progress}
-                onAnswer={answer}
-                onFinish={finishSession}
-                onBack={home}
-              />
-            </View>
+            {pool.length === 0 ? (
+              (view === 'learn' || view === 'quiz') && (
+                <View style={[styles.screen, styles.loading, { padding: 32, gap: 14 }]}>
+                  <Ionicons name="albums-outline" size={44} color={colors.muted} />
+                  <Text style={styles.emptyTitle}>Aucun mot à réviser</Text>
+                  <Text style={styles.emptyText}>
+                    Cochez au moins une catégorie de mots pour la télécharger sur votre téléphone.
+                  </Text>
+                  <Pressable onPress={() => setView('categories')} accessibilityRole="button" style={styles.emptyButton}>
+                    <Text style={styles.emptyButtonText}>Choisir mes catégories</Text>
+                  </Pressable>
+                </View>
+              )
+            ) : (
+              <>
+                {/* Cartes et Quiz restent montés pour conserver la partie en cours. */}
+                <View style={[styles.screen, view !== 'learn' && styles.hidden]}>
+                  <LearnScreen
+                    key={deckKey}
+                    words={pool}
+                    progress={progress}
+                    onAnswer={answer}
+                    onFinish={() => finishSession()}
+                    onBack={home}
+                    onSettings={() => setSettingsOpen(true)}
+                  />
+                </View>
+                <View style={[styles.screen, view !== 'quiz' && styles.hidden]}>
+                  <QuizScreen
+                    key={deckKey}
+                    words={pool}
+                    progress={progress}
+                    onAnswer={answer}
+                    onFinish={finishSession}
+                    onBack={home}
+                  />
+                </View>
+              </>
+            )}
             {view === 'home' && (
               <View style={styles.screen}>
                 <HomeScreen
                   name={settings.name.trim()}
+                  words={pool}
                   progress={progress}
                   onOpen={setView}
                   onSettings={() => setSettingsOpen(true)}
@@ -156,7 +188,7 @@ function Root() {
                   key={duel.id}
                   words={pool}
                   progress={progress}
-                  onAnswer={answer}
+                  onAnswer={answerDuel}
                   onFinish={finishDuel}
                   onBack={() => setView('profile')}
                   challenge={duel}
@@ -165,16 +197,14 @@ function Root() {
             )}
             {view === 'stats' && (
               <View style={styles.screen}>
-                <StatsScreen progress={progress} onBack={home} />
+                <StatsScreen words={pool} progress={progress} onBack={home} />
               </View>
             )}
             {view === 'categories' && (
               <View style={styles.screen}>
                 <CategoriesScreen
-                  selected={selectedThemes}
-                  onChange={(chosen) =>
-                    change({ excluded: themes.map((theme) => theme.id).filter((id) => !chosen.includes(id)) })
-                  }
+                  selected={settings.selected}
+                  onChange={(selected) => change({ selected })}
                   onStart={() => setView('learn')}
                   onBack={home}
                 />
@@ -227,6 +257,17 @@ const makeStyles = (c: Colors) =>
     screen: { flex: 1 },
     hidden: { display: 'none' },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    emptyTitle: { fontSize: 20, fontWeight: '800', color: c.text },
+    emptyText: { fontSize: 15, lineHeight: 22, color: c.muted, textAlign: 'center' },
+    emptyButton: {
+      height: 48,
+      paddingHorizontal: 22,
+      borderRadius: 10,
+      backgroundColor: c.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyButtonText: { color: c.onAccent, fontWeight: '700', fontSize: 15 },
     tabBar: {
       flexDirection: 'row',
       borderTopWidth: 1,

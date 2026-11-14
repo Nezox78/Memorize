@@ -1,107 +1,166 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { THEMES as BUILTIN_THEMES, WORDS as BUILTIN_WORDS } from './data/words';
-import { LEVELS, Word } from './logic/engine';
+import { Word } from './logic/engine';
 import { supabase } from './online/supabase';
 
-/** Tables de mots de la base en ligne. Colonnes : french, english, theme (et category, facultative). */
-const WORD_TABLES = ['mots_anglais_animaux', 'mots_anglais_sport', 'mots_anglais_pays_continents'];
+/** Une catégorie de mots = une table "mots_anglais_*" de la base en ligne. */
+export type Category = { table: string; theme: string; count: number };
 
-const CACHE_KEY = 'memorize.remoteWords.v1';
+type StoredWord = { french: string; english: string; theme: string };
+/** Mots téléchargés sur l'appareil, par table. */
+type Library = Record<string, StoredWord[]>;
 
-type RemoteWord = { french: string; english: string; theme: string; level: number };
-export type ThemeInfo = { id: string; name: string; text: string };
+const CATALOG_KEY = 'memorize.catalog.v1';
+const LIBRARY_KEY = 'memorize.library.v1';
 
-const THEME_TEXTS: Record<string, string> = {
-  Animaux: 'Animaux domestiques, sauvages, de la ferme…',
-  Sport: 'Disciplines, équipements, compétitions…',
-  'Pays/Continents': 'Pays, continents, régions du monde…',
-};
+/** Utilisées si la liste des catégories ne peut pas être lue et qu'aucune copie n'existe. */
+const KNOWN_TABLES: Category[] = [
+  { table: 'mots_anglais_animaux', theme: 'Animaux', count: 0 },
+  { table: 'mots_anglais_pays_continents', theme: 'Pays/Continents', count: 0 },
+  { table: 'mots_anglais_sport', theme: 'Sport', count: 0 },
+];
 
-type Row = { french?: string | null; english?: string | null; theme?: string | null; category?: string | null };
+async function fetchCatalog(): Promise<Category[]> {
+  if (!supabase) throw new Error('offline');
+  const { data, error } = await supabase.rpc('word_categories');
+  if (error) throw new Error(error.message);
+  return (data as { table_name: string; theme: string | null; words: number }[])
+    .filter((row) => row.words > 0)
+    .map((row) => ({ table: row.table_name, theme: row.theme?.trim() || row.table_name, count: row.words }));
+}
 
-function toRemoteWords(rows: Row[], fallbackTheme: string): RemoteWord[] {
-  return rows.flatMap((row) => {
+async function fetchWords(category: Category): Promise<StoredWord[]> {
+  if (!supabase) throw new Error('offline');
+  const { data, error } = await supabase.from(category.table).select('french, english, theme');
+  if (error) throw new Error(error.message);
+  return (data as { french: string | null; english: string | null; theme: string | null }[]).flatMap((row) => {
     const french = row.french?.trim();
     const english = row.english?.trim();
-    if (!french || !english) return [];
-    // Sans colonne "category", un mot démarre en Débutant.
-    const level = LEVELS.findIndex((name) => name.toLowerCase() === row.category?.trim().toLowerCase());
-    return [{ french, english, theme: row.theme?.trim() || fallbackTheme, level: Math.max(level, 0) }];
+    return french && english ? [{ french, english, theme: row.theme?.trim() || category.theme }] : [];
   });
 }
 
-async function downloadWords(): Promise<RemoteWord[]> {
-  if (!supabase) return [];
-  const client = supabase;
-  const tables = await Promise.all(
-    WORD_TABLES.map(async (table) => {
-      const { data, error } = await client.from(table).select('*');
-      if (error) throw new Error(error.message);
-      return toRemoteWords(data as Row[], table);
-    }),
+/** Chaque mot garde sa catégorie, et démarre en Débutant (niveau 0). */
+function toWords(library: Library): Word[] {
+  return Object.entries(library).flatMap(([table, items]) =>
+    items.map((item) => ({ id: `${table}:${item.french}`, level: 0, ...item })),
   );
-  return tables.flat();
 }
 
-/** Fusionne les mots intégrés à l'app et ceux de la base : la base l'emporte en cas de doublon. */
-function merge(remote: RemoteWord[]): { words: Word[]; themes: ThemeInfo[] } {
-  const byKey = new Map(BUILTIN_WORDS.map((word) => [word.french.toLowerCase(), word]));
-  const themes: ThemeInfo[] = [];
-  for (const item of remote) {
-    const key = item.french.toLowerCase();
-    const existing = byKey.get(key);
-    // Un mot déjà intégré garde sa clé et son niveau, pour ne pas perdre la progression.
-    byKey.set(
-      key,
-      existing
-        ? { ...existing, english: item.english, theme: item.theme }
-        : { french: item.french, english: item.english, level: item.level, theme: item.theme },
-    );
-    if (!themes.some((theme) => theme.id === item.theme)) {
-      themes.push({ id: item.theme, name: item.theme, text: THEME_TEXTS[item.theme] ?? 'Mots de la base en ligne…' });
-    }
-  }
-  return { words: [...byKey.values()], themes: [...themes, ...BUILTIN_THEMES] };
-}
+type WordsValue = {
+  /** Catégories proposées par la base. */
+  catalog: Category[];
+  /** Tous les mots téléchargés sur l'appareil, toutes catégories confondues. */
+  words: Word[];
+  /** Tables dont les mots sont sur l'appareil. */
+  downloaded: string[];
+  /** False tant que la copie locale n'a pas été lue. */
+  ready: boolean;
+  /** Télécharge les mots d'une catégorie. Renvoie false si c'est impossible (hors ligne). */
+  download: (table: string) => Promise<boolean>;
+};
 
-const WordsContext = createContext(merge([]));
+const WordsContext = createContext<WordsValue>({
+  catalog: [],
+  words: [],
+  downloaded: [],
+  ready: false,
+  download: async () => false,
+});
 
 /**
- * Fournit les mots à toute l'app. Ils sont lus sur l'appareil (mots intégrés +
- * dernière copie téléchargée), puis rafraîchis depuis la base quand il y a du réseau.
+ * Les mots viennent de la base en ligne et sont enregistrés sur l'appareil,
+ * catégorie par catégorie, quand l'utilisateur les coche. L'app fonctionne
+ * ensuite hors ligne ; les catégories déjà téléchargées sont rafraîchies au lancement.
  */
 export function WordsProvider({ children }: { children: ReactNode }) {
-  const [remote, setRemote] = useState<RemoteWord[]>([]);
+  const [catalog, setCatalog] = useState<Category[]>([]);
+  const [library, setLibrary] = useState<Library>({});
+  const [ready, setReady] = useState(false);
+  const state = useRef({ catalog, library });
+  state.current = { catalog, library };
+
+  const store = useCallback((table: string, items: StoredWord[]) => {
+    const next = { ...state.current.library, [table]: items };
+    state.current.library = next;
+    setLibrary(next);
+    AsyncStorage.setItem(LIBRARY_KEY, JSON.stringify(next)).catch(() => {});
+  }, []);
+
+  const download = useCallback(
+    async (table: string) => {
+      const category = state.current.catalog.find((item) => item.table === table);
+      if (!category) return false;
+      try {
+        const items = await fetchWords(category);
+        if (!items.length) return false;
+        store(table, items);
+        return true;
+      } catch {
+        // Hors ligne : une copie déjà présente sur l'appareil reste utilisable.
+        return Boolean(state.current.library[table]?.length);
+      }
+    },
+    [store],
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      let savedCatalog: Category[] = KNOWN_TABLES;
+      let savedLibrary: Library = {};
       try {
-        const cached = await AsyncStorage.getItem(CACHE_KEY);
-        if (cached && !cancelled) setRemote(JSON.parse(cached));
+        const [rawCatalog, rawLibrary] = await Promise.all([
+          AsyncStorage.getItem(CATALOG_KEY),
+          AsyncStorage.getItem(LIBRARY_KEY),
+        ]);
+        if (rawCatalog) savedCatalog = JSON.parse(rawCatalog);
+        if (rawLibrary) savedLibrary = JSON.parse(rawLibrary);
       } catch {
-        // Copie locale illisible : on attend le téléchargement.
+        // Copie locale illisible : on repart de la base.
       }
+      if (cancelled) return;
+      state.current = { catalog: savedCatalog, library: savedLibrary };
+      setCatalog(savedCatalog);
+      setLibrary(savedLibrary);
+      setReady(true);
+
       try {
-        const fresh = await downloadWords();
+        const fresh = await fetchCatalog();
         if (cancelled || !fresh.length) return;
-        setRemote(fresh);
-        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+        state.current.catalog = fresh;
+        setCatalog(fresh);
+        AsyncStorage.setItem(CATALOG_KEY, JSON.stringify(fresh)).catch(() => {});
+        // Récupère les mots ajoutés depuis la dernière fois dans les catégories déjà téléchargées.
+        for (const table of Object.keys(savedLibrary)) {
+          const category = fresh.find((item) => item.table === table);
+          if (!category) continue;
+          const items = await fetchWords(category);
+          if (cancelled) return;
+          if (items.length) store(table, items);
+        }
       } catch {
-        // Hors ligne : on garde la copie locale.
+        // Hors ligne : la copie locale suffit.
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [store]);
 
-  const value = useMemo(() => merge(remote), [remote]);
+  const value = useMemo(
+    () => ({ catalog, words: toWords(library), downloaded: Object.keys(library), ready, download }),
+    [catalog, library, ready, download],
+  );
   return <WordsContext.Provider value={value}>{children}</WordsContext.Provider>;
 }
 
 export function useWords() {
   return useContext(WordsContext);
+}
+
+/** Table d'origine d'un mot, d'après son identifiant. */
+export function tableOf(word: Word): string {
+  return word.id.slice(0, word.id.indexOf(':'));
 }
