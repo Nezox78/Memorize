@@ -34,7 +34,7 @@ export function LevelScreen({ level, words, progress, onBack }: Props) {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <Text style={styles.note}>
-            Un mot de ce niveau a {WEIGHTS[level]} % de chances d'être tiré à chaque carte.
+            À chaque carte, il y a {WEIGHTS[level]} % de chances que le mot vienne de ce niveau.
           </Text>
         }
         ListEmptyComponent={
