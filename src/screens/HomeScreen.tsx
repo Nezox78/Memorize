@@ -2,9 +2,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { WORDS } from '../data/words';
 import { LEVELS, Progress, computeStats, dayKey, dayStreak } from '../logic/engine';
 import { Colors, useStyles, useTheme } from '../theme';
+import { useWords } from '../words';
 
 export const DAILY_GOAL = 20;
 
@@ -28,7 +28,8 @@ const LEVEL_ICONS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; color: 
 export function HomeScreen({ name, progress, onOpen, onSettings }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
-  const stats = computeStats(WORDS, progress);
+  const { words } = useWords();
+  const stats = computeStats(words, progress);
   const today = progress.days[dayKey(new Date())] ?? 0;
   const todayPercent = Math.round((today / DAILY_GOAL) * 100);
 

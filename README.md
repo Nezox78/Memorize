@@ -23,22 +23,16 @@ npx expo start
 
 Scanner ensuite le QR code avec l'application **Expo Go** (App Store / Google Play) pour ouvrir l'app sur son téléphone. `npm run web` l'ouvre dans un navigateur.
 
-## Mode en ligne : comptes, classement, défis
+## Mode en ligne : mots, comptes, classement, défis
 
-Les mots et la progression restent sur le téléphone. Un serveur [Supabase](https://supabase.com) (offre gratuite) gère uniquement les comptes, le classement et les défis entre amis, depuis l'onglet **Profil**.
+L'application est reliée à un projet [Supabase](https://supabase.com) ; son adresse et sa clé publique sont dans `.env` (valeurs publiques par conception, embarquées dans l'app).
 
-1. Créer un projet sur supabase.com.
-2. Dans **SQL Editor**, coller et exécuter le contenu de `supabase/migrations/20261113000000_init.sql`.
-3. Copier `.env.example` en `.env` et y mettre l'URL du projet et la clé `anon` (**Project Settings → API**).
-4. Relancer `npx expo start`.
-
-Par défaut, Supabase demande de confirmer l'adresse email à l'inscription ; cela se règle dans **Authentication → Providers → Email**.
-
+- **Mots** : au lancement, l'app télécharge les tables `mots_anglais_animaux`, `mots_anglais_sport` et `mots_anglais_pays_continents` (colonnes `french`, `english`, `theme`), les enregistre sur le téléphone, puis fonctionne hors ligne. Ils s'ajoutent aux mots intégrés à l'app. Une colonne `category` facultative (Débutant, Novice, Intermédiaire, Avancé, Expert) fixe le niveau de départ ; sans elle, un mot démarre en Débutant. Pour ajouter une table de mots, compléter `WORD_TABLES` dans `src/words.tsx`.
+- **Comptes** : inscription avec pseudo, email et mot de passe, depuis l'onglet **Profil**.
 - **Classement** : 10 XP par bonne réponse (cartes et quiz), publiés automatiquement quand on est connecté.
 - **Défis** : on saisit le pseudo d'un ami, les deux joueurs traduisent les mêmes 10 mots, le meilleur score gagne.
-- Sans fichier `.env`, l'application fonctionne normalement et l'onglet Profil indique que le mode en ligne n'est pas configuré.
 
-Pour tester en local avec Docker : `npx supabase start`, puis utiliser l'URL et la clé affichées.
+La progression de chaque mot reste sur le téléphone. Les tables `profiles` et `challenges` et leurs règles d'accès sont décrites dans `supabase/migrations/`. Sans `.env`, l'application fonctionne avec les seuls mots intégrés.
 
 ## Publier sur les stores
 
@@ -56,7 +50,8 @@ Il faut un compte Expo, un compte Apple Developer (99 $/an) et un compte Google 
 
 | Fichier | Rôle |
 | --- | --- |
-| `src/data/words.ts` | Les 496 mots, classés par niveau de départ et par thème |
+| `src/data/words.ts` | Les 496 mots intégrés, classés par niveau de départ et par thème |
+| `src/words.tsx` | Téléchargement des mots de la base et copie locale |
 | `src/logic/engine.ts` | Tirage pondéré, montée / descente de catégorie, statistiques |
 | `src/useProgress.ts` | Chargement et sauvegarde de la progression (AsyncStorage) |
 | `src/theme.tsx` | Couleurs des thèmes clair et sombre |

@@ -1,11 +1,14 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ALL_THEMES, THEMES, WORDS } from '../data/words';
 import { ThemeId } from '../logic/engine';
-import { Colors, themeColors, useStyles, useTheme } from '../theme';
+import { Colors, themeLook, useStyles, useTheme } from '../theme';
+import { useWords } from '../words';
 
 const ICONS: Record<ThemeId, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  Animaux: 'paw-outline',
+  Sport: 'soccer',
+  'Pays/Continents': 'earth',
   food: 'food-apple-outline',
   clothes: 'tshirt-crew-outline',
   vehicles: 'car-outline',
@@ -23,6 +26,7 @@ type Props = {
 export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
+  const { words: allWords, themes } = useWords();
   const count = selected.length;
 
   const toggle = (id: ThemeId) =>
@@ -41,10 +45,10 @@ export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props)
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {THEMES.map((theme) => {
-          const look = themeColors[theme.id];
+        {themes.map((theme, index) => {
+          const look = themeLook(theme.id, index);
           const active = selected.includes(theme.id);
-          const words = WORDS.filter((word) => word.theme === theme.id).length;
+          const words = allWords.filter((word) => word.theme === theme.id).length;
           return (
             <Pressable
               key={theme.id}
@@ -60,7 +64,7 @@ export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props)
                 },
               ]}
             >
-              <MaterialCommunityIcons name={ICONS[theme.id]} size={30} color={look.main} />
+              <MaterialCommunityIcons name={ICONS[theme.id] ?? 'tag-outline'} size={30} color={look.main} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.rowTitle}>{theme.name}</Text>
                 <Text style={styles.caption} numberOfLines={2}>
@@ -96,7 +100,7 @@ export function CategoriesScreen({ selected, onChange, onStart, onBack }: Props)
         </Pressable>
 
         <View style={styles.pair}>
-          <Pressable onPress={() => onChange(ALL_THEMES)} accessibilityRole="button" style={styles.outline}>
+          <Pressable onPress={() => onChange(themes.map((theme) => theme.id))} accessibilityRole="button" style={styles.outline}>
             <Text style={styles.outlineText}>Tout sélectionner</Text>
           </Pressable>
           <Pressable onPress={() => onChange([])} accessibilityRole="button" style={styles.outline}>

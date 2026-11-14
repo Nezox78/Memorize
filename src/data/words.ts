@@ -91,7 +91,7 @@ const RAW: string[] = [
 ];
 
 // Mots rattachés à un thème ; tous les autres vont dans « Vocabulaire général ».
-const THEME_WORDS: Record<Exclude<ThemeId, 'general'>, string> = {
+const THEME_WORDS: Record<string, string> = {
   food: `pain;pomme;lait;fromage;œuf;poisson;eau;manger;boire;riz;beurre;soupe;thé;café;fruit;gâteau;légume;viande;
     sucre;sel;cuisiner;couteau;fourchette;cuillère;verre;assiette;poulet;fraise;oignon;pomme de terre;
     petit-déjeuner;goût;farine;ail;champignon;miel;recette;mâcher;avaler;récolte;levure;persil;noisette;
@@ -114,7 +114,7 @@ const split = (block: string) =>
 
 const themeOf = new Map<string, ThemeId>();
 for (const [theme, block] of Object.entries(THEME_WORDS)) {
-  for (const french of split(block)) themeOf.set(french, theme as ThemeId);
+  for (const french of split(block)) themeOf.set(french, theme);
 }
 
 export const WORDS: Word[] = RAW.flatMap((block, level) =>
@@ -131,5 +131,3 @@ export const THEMES: { id: ThemeId; name: string; text: string }[] = [
   { id: 'places', name: 'Infrastructures', text: 'Bâtiments, lieux publics, architectures…' },
   { id: 'general', name: 'Vocabulaire général', text: 'Tous les autres mots du quotidien…' },
 ];
-
-export const ALL_THEMES: ThemeId[] = THEMES.map((theme) => theme.id);

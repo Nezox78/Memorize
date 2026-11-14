@@ -4,7 +4,8 @@ export const MAX_LEVEL = LEVELS.length - 1;
 /** Probabilité d'apparition (en %) de chaque catégorie, dans l'ordre de LEVELS. */
 export const WEIGHTS = [40, 30, 15, 10, 5];
 
-export type ThemeId = 'food' | 'clothes' | 'vehicles' | 'places' | 'general';
+/** Identifiant d'un thème de mots (intégré à l'app ou venu de la base en ligne). */
+export type ThemeId = string;
 
 export type Word = {
   french: string;

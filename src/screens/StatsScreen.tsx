@@ -3,9 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Header, ProgressBar } from '../components/ui';
-import { WORDS } from '../data/words';
 import { LEVELS, Progress, bestDayStreak, computeStats, currentWeek, dayStreak } from '../logic/engine';
 import { Colors, levelColors, useStyles, useTheme } from '../theme';
+import { useWords } from '../words';
 
 export const WEEKLY_GOAL = 100;
 
@@ -16,7 +16,8 @@ type Props = { progress: Progress; onBack: () => void };
 export function StatsScreen({ progress, onBack }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
-  const stats = computeStats(WORDS, progress);
+  const { words } = useWords();
+  const stats = computeStats(words, progress);
   const week = currentWeek();
   const weekCount = week.reduce((sum, key) => sum + (progress.days[key] ?? 0), 0);
 

@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ALL_THEMES } from './data/words';
 import { EMPTY_PROGRESS, Progress, ThemeId, Word, applyAnswer } from './logic/engine';
 
 const PROGRESS_KEY = 'memorize.progress.v1';
@@ -51,11 +50,12 @@ export function useProgress() {
   return { progress, answer, finishSession, reset };
 }
 
-export type Settings = { name: string; themes: ThemeId[] };
+/** `excluded` : thèmes décochés. Un nouveau thème de la base est donc actif par défaut. */
+export type Settings = { name: string; excluded: ThemeId[] };
 
-const DEFAULT_SETTINGS: Settings = { name: '', themes: ALL_THEMES };
+const DEFAULT_SETTINGS: Settings = { name: '', excluded: [] };
 
-/** Prénom et thèmes de mots choisis, sauvegardés sur l'appareil. */
+/** Prénom et thèmes de mots écartés, sauvegardés sur l'appareil. */
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 

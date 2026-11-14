@@ -1,7 +1,8 @@
 -- Memorize : comptes, classement et défis entre amis.
 -- À exécuter une fois dans le projet Supabase (SQL Editor) ou via `supabase db push`.
 
--- Profils publics : un par compte, créé automatiquement à l'inscription.
+-- Profils publics des joueurs (pseudo et score). Séparés de user_profiles,
+-- qui contient l'email et reste privé.
 create table public.profiles (
   id uuid primary key references auth.users on delete cascade,
   username text not null check (char_length(username) between 3 and 20),
@@ -24,18 +25,28 @@ create policy "Chacun modifie son propre profil"
   on public.profiles for update
   using (auth.uid() = id) with check (auth.uid() = id);
 
-create function public.handle_new_user() returns trigger
+create policy "Chacun crée son propre profil"
+  on public.profiles for insert
+  with check (auth.uid() = id);
+
+-- Crée le profil à l'inscription quand un pseudo est fourni. Les comptes créés
+-- sans pseudo (autre application, comptes existants) le choisissent dans l'app.
+create function public.handle_new_player() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, username)
-  values (new.id, new.raw_user_meta_data ->> 'username');
+  if new.raw_user_meta_data ->> 'username' is not null then
+    insert into public.profiles (id, username)
+    values (new.id, new.raw_user_meta_data ->> 'username');
+  end if;
   return new;
 end;
 $$;
 
-create trigger on_auth_user_created
+revoke execute on function public.handle_new_player() from public, anon, authenticated;
+
+create trigger on_auth_user_created_player
   after insert on auth.users
-  for each row execute function public.handle_new_user();
+  for each row execute function public.handle_new_player();
 
 -- Défis : les deux joueurs répondent aux mêmes mots, le meilleur score gagne.
 create table public.challenges (

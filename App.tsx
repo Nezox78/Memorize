@@ -5,7 +5,6 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingsModal } from './src/components/SettingsModal';
-import { WORDS } from './src/data/words';
 import { Word, computeStats, dayStreak, pickWord } from './src/logic/engine';
 import { Challenge, submitChallengeScore, syncStats } from './src/online/api';
 import { useAccount } from './src/online/useAccount';
@@ -17,6 +16,7 @@ import { QuizScreen } from './src/screens/QuizScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { Colors, ThemeProvider, useStyles, useTheme } from './src/theme';
 import { useProgress, useSettings } from './src/useProgress';
+import { WordsProvider, useWords } from './src/words';
 
 const TABS: { id: View_; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'home', label: 'Accueil', icon: 'home-outline' },
@@ -30,7 +30,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <Root />
+        <WordsProvider>
+          <Root />
+        </WordsProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
@@ -44,6 +46,8 @@ function Root() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { progress, answer, finishSession, reset } = useProgress();
   const { settings, change } = useSettings();
+  const { words: WORDS, themes } = useWords();
+  const selectedThemes = themes.map((theme) => theme.id).filter((id) => !settings.excluded.includes(id));
   const account = useAccount();
   const [duel, setDuel] = useState<{ id: string; opponent: string; words: Word[] } | null>(null);
 
@@ -93,10 +97,10 @@ function Root() {
 
   // Mots des thèmes choisis ; tous les mots si aucun thème n'est sélectionné.
   const pool = useMemo(() => {
-    const chosen = WORDS.filter((word) => settings.themes.includes(word.theme));
+    const chosen = WORDS.filter((word) => !settings.excluded.includes(word.theme));
     return chosen.length ? chosen : WORDS;
-  }, [settings.themes]);
-  const deckKey = `${resets}-${settings.themes.join(',')}`;
+  }, [WORDS, settings.excluded]);
+  const deckKey = `${resets}-${settings.excluded.join(',')}`;
   const home = () => setView('home');
 
   return (
@@ -167,8 +171,10 @@ function Root() {
             {view === 'categories' && (
               <View style={styles.screen}>
                 <CategoriesScreen
-                  selected={settings.themes}
-                  onChange={(themes) => change({ themes })}
+                  selected={selectedThemes}
+                  onChange={(chosen) =>
+                    change({ excluded: themes.map((theme) => theme.id).filter((id) => !chosen.includes(id)) })
+                  }
                   onStart={() => setView('learn')}
                   onBack={home}
                 />
