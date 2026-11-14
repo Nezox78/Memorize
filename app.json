@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Memorize",
-    "slug": "memorize",
+    "name": "VocabSwipe",
+    "slug": "vocabswipe",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nezox78.memorize"
+      "bundleIdentifier": "com.nezox78.vocabswipe"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.nezox78.memorize"
+      "package": "com.nezox78.vocabswipe"
     },
     "web": {
       "favicon": "./assets/favicon.png"

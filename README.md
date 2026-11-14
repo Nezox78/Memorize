@@ -1,4 +1,4 @@
-# Memorize
+# VocabSwipe
 
 Application mobile (iPhone et Android) pour mémoriser du vocabulaire anglais avec des cartes à swiper.
 
@@ -43,7 +43,7 @@ npx eas-cli@latest build --platform all
 npx eas-cli@latest submit --platform all
 ```
 
-Il faut un compte Expo, un compte Apple Developer (99 $/an) et un compte Google Play Console (25 $ une fois). Les identifiants de l'app (`com.nezox78.memorize`) se changent dans `app.json`.
+Il faut un compte Expo, un compte Apple Developer (99 $/an) et un compte Google Play Console (25 $ une fois). Les identifiants de l'app (`com.nezox78.vocabswipe`) se changent dans `app.json`.
 
 ## Structure
 
