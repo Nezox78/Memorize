@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Header, ProgressBar } from '../components/ui';
 import { LEVELS, Progress, Word, bestDayStreak, computeStats, currentWeek, dayStreak } from '../logic/engine';
@@ -10,9 +10,9 @@ export const WEEKLY_GOAL = 100;
 
 const WEEK = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
-type Props = { words: Word[]; progress: Progress; onBack: () => void };
+type Props = { words: Word[]; progress: Progress; onBack: () => void; onOpenLevel: (level: number) => void };
 
-export function StatsScreen({ words, progress, onBack }: Props) {
+export function StatsScreen({ words, progress, onBack, onOpenLevel }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
   const stats = computeStats(words, progress);
@@ -115,7 +115,13 @@ export function StatsScreen({ words, progress, onBack }: Props) {
         {LEVELS.map((name, i) => {
           const share = stats.total ? Math.round((stats.perLevel[i] / stats.total) * 100) : 0;
           return (
-            <View key={name} style={styles.level}>
+            <Pressable
+              key={name}
+              onPress={() => onOpenLevel(i)}
+              accessibilityRole="button"
+              accessibilityLabel={`Voir les mots de la catégorie ${name}`}
+              style={({ pressed }) => [styles.level, pressed && { opacity: 0.6 }]}
+            >
               <View style={styles.levelIcon}>
                 <LinearGradient
                   colors={['#FFFFFF', levelColors[i]]}
@@ -134,7 +140,7 @@ export function StatsScreen({ words, progress, onBack }: Props) {
               </View>
               <Text style={styles.levelPercent}>{share}%</Text>
               <Ionicons name="chevron-forward" size={16} color={dark ? colors.muted : '#475569'} />
-            </View>
+            </Pressable>
           );
         })}
       </ScrollView>

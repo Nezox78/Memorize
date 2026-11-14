@@ -11,6 +11,7 @@ import { useAccount } from './src/online/useAccount';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { HomeScreen, View_ } from './src/screens/HomeScreen';
 import { LearnScreen } from './src/screens/LearnScreen';
+import { LevelScreen } from './src/screens/LevelScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { QuizScreen } from './src/screens/QuizScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
@@ -44,6 +45,12 @@ function Root() {
   const styles = useStyles(makeStyles);
   const [view, setView] = useState<View_>('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Niveau dont on affiche les mots, et écran vers lequel revenir.
+  const [levelView, setLevelView] = useState<{ level: number; from: View_ }>({ level: 0, from: 'home' });
+  const openLevel = (level: number) => {
+    setLevelView({ level, from: view });
+    setView('level');
+  };
   const { progress, answer, finishSession, reset } = useProgress();
   const { settings, loaded, change } = useSettings();
   const { words: downloadedWords, ready } = useWords();
@@ -173,6 +180,7 @@ function Root() {
                   words={pool}
                   progress={progress}
                   onOpen={setView}
+                  onOpenLevel={openLevel}
                   onSettings={() => setSettingsOpen(true)}
                 />
               </View>
@@ -197,7 +205,17 @@ function Root() {
             )}
             {view === 'stats' && (
               <View style={styles.screen}>
-                <StatsScreen words={pool} progress={progress} onBack={home} />
+                <StatsScreen words={pool} progress={progress} onBack={home} onOpenLevel={openLevel} />
+              </View>
+            )}
+            {view === 'level' && (
+              <View style={styles.screen}>
+                <LevelScreen
+                  level={levelView.level}
+                  words={pool}
+                  progress={progress}
+                  onBack={() => setView(levelView.from)}
+                />
               </View>
             )}
             {view === 'categories' && (
@@ -216,7 +234,8 @@ function Root() {
         <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           {TABS.map(({ id, label, icon }) => {
             const active =
-              view === id || (id === 'home' && view === 'categories') || (id === 'profile' && view === 'challenge');
+              view === id || (id === 'home' && (view === 'categories' || (view === 'level' && levelView.from === 'home'))) ||
+              (id === 'stats' && view === 'level' && levelView.from === 'stats') || (id === 'profile' && view === 'challenge');
             const color = active ? colors.highlight : colors.muted;
             return (
               <Pressable

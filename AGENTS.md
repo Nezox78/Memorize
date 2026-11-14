@@ -25,7 +25,7 @@ Run lint and typecheck before declaring any task done.
 
 ## Navigation
 
-- The app has six screens (`src/screens/`) switched by a simple tab bar in `App.tsx`; there is no router. Introduce Expo Router only if more screens are needed.
+- The app has seven screens (`src/screens/`) switched by a simple tab bar in `App.tsx`; there is no router. Introduce Expo Router only if more screens are needed.
 
 ## Building with EAS
 

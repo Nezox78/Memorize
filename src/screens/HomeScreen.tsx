@@ -7,7 +7,7 @@ import { Colors, useStyles, useTheme } from '../theme';
 
 export const DAILY_GOAL = 20;
 
-export type View_ = 'home' | 'learn' | 'quiz' | 'stats' | 'categories' | 'profile' | 'challenge';
+export type View_ = 'home' | 'learn' | 'quiz' | 'stats' | 'categories' | 'profile' | 'challenge' | 'level';
 
 type Props = {
   name: string;
@@ -15,6 +15,8 @@ type Props = {
   words: Word[];
   progress: Progress;
   onOpen: (view: View_) => void;
+  /** Ouvre la liste des mots d'un niveau. */
+  onOpenLevel: (level: number) => void;
   onSettings: () => void;
 };
 
@@ -26,7 +28,7 @@ const LEVEL_ICONS: { icon: keyof typeof MaterialCommunityIcons.glyphMap; color: 
   { icon: 'trophy-outline', color: '#EA580C', soft: '#FFEDD5' },
 ];
 
-export function HomeScreen({ name, words, progress, onOpen, onSettings }: Props) {
+export function HomeScreen({ name, words, progress, onOpen, onOpenLevel, onSettings }: Props) {
   const { colors, dark } = useTheme();
   const styles = useStyles(makeStyles);
   const stats = computeStats(words, progress);
@@ -114,8 +116,9 @@ export function HomeScreen({ name, words, progress, onOpen, onSettings }: Props)
         return (
           <Pressable
             key={level}
-            onPress={() => onOpen('learn')}
+            onPress={() => onOpenLevel(i)}
             accessibilityRole="button"
+            accessibilityLabel={`Voir les mots du niveau ${level}`}
             style={({ pressed }) => [styles.panel, styles.row, pressed && { opacity: 0.7 }]}
           >
             <View style={[styles.rowIcon, { backgroundColor: dark ? `${look.color}26` : look.soft }]}>
